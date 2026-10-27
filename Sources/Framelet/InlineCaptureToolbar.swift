@@ -13,71 +13,105 @@ struct InlineCaptureToolbar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        toolButton("移动选区", symbol: "cursorarrow", selected: document.tool == nil, key: key(for: .move)) {
-                            chooseTool(nil)
-                        }
-                        Divider().frame(height: 20).padding(.horizontal, 2)
-                        ForEach(MarkTool.allCases) { tool in
-                            toolButton(tool.title, symbol: tool.symbol, selected: document.tool == tool, key: key(for: ToolKeyAction(markTool: tool))) {
-                                chooseTool(document.tool == tool ? nil : tool)
-                            }
-                        }
-                        Divider().frame(height: 20).padding(.horizontal, 2)
-                        iconButton("撤销", symbol: "arrow.uturn.backward", key: "⌘Z") { action(.undo) }.disabled(!document.canUndo)
-                        iconButton("重做", symbol: "arrow.uturn.forward", key: "⇧⌘Z") { action(.redo) }.disabled(!document.canRedo)
-                        iconButton("重新选择", symbol: "viewfinder") { action(.reselect) }
-                        Divider().frame(height: 20).padding(.horizontal, 2)
-                        iconButton(document.recognizing ? "识别中" : "提取文字", symbol: "text.viewfinder", key: key(for: .ocr)) { action(.ocr) }.disabled(document.recognizing)
-                        iconButton("贴图", symbol: "pin", key: key(for: .pin)) { action(.pin) }
-                        iconButton("保存", symbol: "square.and.arrow.down", key: "⌘S") { action(.save) }
-                    }.padding(.horizontal, 9).padding(.vertical, 6)
-                }
-                Divider().frame(height: 24)
-                Button { action(.cancel) } label: {
-                    Image(systemName: "xmark").font(.system(size: 14, weight: .semibold)).frame(width: 30, height: 32)
-                }.buttonStyle(.plain).help("取消 · Esc").accessibilityLabel("取消")
-                Button { action(.complete) } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "checkmark").font(.system(size: 12, weight: .bold))
-                        Text("完成").font(.system(size: 12, weight: .semibold))
-                    }.padding(.horizontal, 12).frame(height: 32)
-                }.buttonStyle(.plain).foregroundStyle(.white).background(Palette.blue, in: RoundedRectangle(cornerRadius: 6))
-                    .help("\(settings.settings.completionAction.title)并退出 · Enter").accessibilityLabel("完成")
-            }.frame(height: 44).background(.white)
-
+            ViewThatFits(in: .horizontal) {
+                mainRow(compact: false)
+                mainRow(compact: true)
+                mainRow(compact: true, minimal: true)
+            }
+            .padding(.horizontal, 8).frame(height: 44)
             if document.tool != nil {
-                Divider().padding(.horizontal, 8)
-                HStack(spacing: 8) {
-                    ForEach(Array(colors.enumerated()), id: \.offset) { _, color in
-                        Button { setColor(color) } label: {
-                            Circle().fill(Color(nsColor: color)).frame(width: 13, height: 13)
-                                .overlay(Circle().stroke(.gray.opacity(0.4), lineWidth: 1)).padding(3)
-                                .overlay(Circle().stroke(document.color == color ? Palette.blue : .clear, lineWidth: 1.5))
-                        }.buttonStyle(.plain).accessibilityLabel(color.accessibilityName)
-                    }
-                    Divider().frame(height: 14).padding(.horizontal, 2)
-                    if document.tool == .text {
-                        Text("字号").font(.system(size: 10)).foregroundStyle(Palette.muted)
-                        Slider(value: fontSizeBinding, in: 10...48, step: 1).frame(width: 80).accessibilityLabel("文字字号")
-                    } else {
-                        Text("粗细").font(.system(size: 10)).foregroundStyle(Palette.muted)
-                        Slider(value: strokeBinding, in: 2...12, step: 1).frame(width: 80).accessibilityLabel("标注粗细")
-                    }
-                    Spacer(minLength: 8)
-                    if document.recognizing { ProgressView().controlSize(.mini) }
-                    Text(document.message ?? hint).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1)
-                    Text("\(document.pixelWidth) × \(document.pixelHeight)").font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted)
-                }.padding(.horizontal, 12).frame(height: 40).background(.white)
+                Divider().padding(.horizontal, 10)
+                ViewThatFits(in: .horizontal) {
+                    properties(showDetails: true)
+                    properties(showDetails: false)
+                }.padding(.horizontal, 12).frame(height: 40)
             }
         }
-        .background(.white, in: RoundedRectangle(cornerRadius: 11))
-        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Palette.ink.opacity(0.12), lineWidth: 1))
-        .foregroundStyle(Palette.ink).preferredColorScheme(.light)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.border, lineWidth: 1))
+        .foregroundStyle(Palette.ink).tint(Palette.blue).help(hint)
         .onChange(of: document.showOCR) { _, show in if show { showOCRPopover = true } }
         .popover(isPresented: $showOCRPopover, arrowEdge: .top) { ocrPopover }
+    }
+
+    private func mainRow(compact: Bool, minimal: Bool = false) -> some View {
+        HStack(spacing: 4) {
+            if !minimal {
+                toolButton("移动选区", symbol: "cursorarrow", selected: document.tool == nil, key: key(for: .move)) { chooseTool(nil) }
+                separator
+            }
+            ForEach(minimal ? [] : compact ? [.rectangle, .arrow, .text] : MarkTool.allCases) { tool in
+                toolButton(tool.title, symbol: tool.symbol, selected: document.tool == tool, key: key(for: ToolKeyAction(markTool: tool))) {
+                    chooseTool(document.tool == tool ? nil : tool)
+                }
+            }
+            separator
+            iconButton("撤销", symbol: "arrow.uturn.backward", key: "⌘Z") { action(.undo) }.disabled(!document.canUndo)
+            Menu {
+                if compact {
+                    Section("更多标注工具") {
+                        if minimal {
+                            Button("移动选区") { chooseTool(nil) }
+                        }
+                        ForEach(MarkTool.allCases.filter { minimal || ![.rectangle, .arrow, .text].contains($0) }) { tool in
+                            Button { chooseTool(document.tool == tool ? nil : tool) } label: {
+                                Label(tool.title, systemImage: tool.symbol)
+                            }
+                        }
+                    }
+                }
+                Button { action(.redo) } label: { Label("重做", systemImage: "arrow.uturn.forward") }.disabled(!document.canRedo)
+                Button { action(.reselect) } label: { Label("重新选择", systemImage: "viewfinder") }
+                Divider()
+                Button { action(.ocr) } label: { Label(document.recognizing ? "识别中…" : "提取文字", systemImage: "text.viewfinder") }.disabled(document.recognizing)
+                Button { action(.pin) } label: { Label("贴图", systemImage: "pin") }
+                if compact { Button { action(.save) } label: { Label("保存…", systemImage: "square.and.arrow.down") } }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 16, weight: .medium)).frame(width: 30, height: 32)
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("更多操作").accessibilityLabel("更多操作")
+            if !compact {
+                iconButton("保存", symbol: "square.and.arrow.down", key: "⌘S") { action(.save) }
+            }
+            Spacer(minLength: 4)
+            separator
+            iconButton("取消", symbol: "xmark", key: "Esc") { action(.cancel) }
+            Button { action(.complete) } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
+                    Text(settings.settings.completionAction.title).font(.system(size: 12, weight: .semibold)).fixedSize()
+                }.padding(.horizontal, 10).frame(height: 30)
+            }.buttonStyle(.borderedProminent).controlSize(.small)
+                .help("\(settings.settings.completionAction.title)并退出 · Enter")
+                .accessibilityLabel("\(settings.settings.completionAction.title)并退出")
+        }.fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var separator: some View { Divider().frame(height: 18).padding(.horizontal, 3) }
+
+    private func properties(showDetails: Bool) -> some View {
+        HStack(spacing: 6) {
+            ForEach(Array(colors.enumerated()), id: \.offset) { _, color in
+                Button { setColor(color) } label: {
+                    Circle().fill(Color(nsColor: color)).frame(width: 12, height: 12)
+                        .overlay(Circle().stroke(Palette.ink.opacity(0.2), lineWidth: 1)).padding(4)
+                        .overlay(Circle().stroke(document.color == color ? Palette.blue : .clear, lineWidth: 1.5))
+                }.buttonStyle(QuietButtonStyle()).accessibilityLabel(color.accessibilityName)
+            }
+            separator
+            if showDetails {
+                Text(document.tool == .text ? "字号" : "粗细").font(.system(size: 10)).foregroundStyle(Palette.muted)
+            }
+            Slider(value: document.tool == .text ? fontSizeBinding : strokeBinding,
+                   in: document.tool == .text ? 10...48 : 2...12, step: 1)
+                .frame(width: showDetails ? 72 : 48).accessibilityLabel(document.tool == .text ? "文字字号" : "标注粗细")
+            Text("\(Int(document.tool == .text ? document.fontSize : document.strokeWidth))")
+                .font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted).frame(width: 18)
+            if showDetails {
+                Spacer(minLength: 12)
+                Text(document.message ?? "\(document.pixelWidth) × \(document.pixelHeight) px")
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted).lineLimit(1)
+            }
+        }
     }
 
     @State private var showOCRPopover = false
@@ -112,21 +146,19 @@ struct InlineCaptureToolbar: View {
 
     private func toolButton(_ title: String, symbol: String, selected: Bool = false, key: String?, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 3) {
-                Image(systemName: symbol).font(.system(size: 15, weight: .medium))
-                if let key { Text(key).font(.system(size: 8, weight: .semibold, design: .monospaced)).opacity(0.55) }
-            }
+            Image(systemName: symbol).font(.system(size: 15, weight: .regular))
             .frame(minWidth: 30, minHeight: 32)
             .foregroundStyle(selected ? Palette.blue : Palette.ink)
             .background(selected ? Palette.blue.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 6))
-        }.buttonStyle(.plain).help(title).accessibilityLabel(title)
+        }.buttonStyle(QuietButtonStyle()).help(key.map { "\(title) · \($0)" } ?? title).accessibilityLabel(title)
+            .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private func iconButton(_ title: String, symbol: String, key: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 15, weight: .medium)).frame(width: 30, height: 32)
                 .foregroundStyle(Palette.ink).contentShape(Rectangle())
-        }.buttonStyle(.plain).help(key.map { "\(title) · \($0)" } ?? title).accessibilityLabel(title)
+        }.buttonStyle(QuietButtonStyle()).help(key.map { "\(title) · \($0)" } ?? title).accessibilityLabel(title)
     }
 
     private var ocrPopover: some View {

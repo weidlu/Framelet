@@ -106,7 +106,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         let appItem = NSMenuItem(); let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于拾影", action: #selector(about), keyEquivalent: "")
         appMenu.addItem(withTitle: "设置…", action: #selector(showSettingsWindow), keyEquivalent: ",")
-        appMenu.addItem(withTitle: "打开工作台", action: #selector(showHome), keyEquivalent: "1")
+        appMenu.addItem(withTitle: "打开截图面板", action: #selector(showHome), keyEquivalent: "1")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "隐藏拾影", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "退出拾影", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -168,7 +168,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
             item.target = self
         }
         menu.addItem(.separator())
-        menu.addItem(withTitle: "打开图片…", action: #selector(importImage), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "设置…", action: #selector(showSettingsWindow), keyEquivalent: ",").target = self
         menu.addItem(withTitle: "打开拾影", action: #selector(showHome), keyEquivalent: "").target = self
         let quit = menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
@@ -353,8 +353,8 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     @objc func showHome() {
         guard sessionState == .idle else { return }
         if home == nil {
-            let window = makeWindow(title: "拾影 · Framelet", size: CGSize(width: 960, height: 660))
-            window.minSize = CGSize(width: 900, height: 640)
+            let window = makeWindow(title: "拾影 · Framelet", size: CGSize(width: 380, height: 420))
+            window.styleMask.remove(.resizable)
             window.contentView = NSHostingView(rootView: HomeView(controller: self, settings: settings))
             home = window
         }
@@ -367,8 +367,8 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
 
     func showSettings(tab: Int) {
         permission = CGPreflightScreenCaptureAccess()
-        let window = settingsWindow ?? makeWindow(title: "拾影设置", size: CGSize(width: 760, height: 620))
-        window.minSize = CGSize(width: 700, height: 560)
+        let window = settingsWindow ?? makeWindow(title: "拾影设置", size: CGSize(width: 800, height: 620))
+        window.minSize = CGSize(width: 760, height: 560)
         window.contentView = NSHostingView(rootView: SettingsView(controller: self, settings: settings, keys: keys, initialTab: tab))
         settingsWindow = window
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
@@ -437,7 +437,6 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     private func makeWindow(title: String, size: CGSize) -> NSWindow {
         let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = title; window.isReleasedWhenClosed = false; window.center()
-        window.appearance = NSAppearance(named: .aqua)
         return window
     }
 
@@ -454,7 +453,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         self.document = document
         super.init(contentRect: CGRect(x: 0, y: 0, width: 1120, height: 780), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         title = "\(document.name) · 拾影"; minSize = CGSize(width: 1060, height: 600)
-        isReleasedWhenClosed = false; delegate = self; appearance = NSAppearance(named: .aqua); center()
+        isReleasedWhenClosed = false; delegate = self; center()
         contentView = NSHostingView(rootView: EditorView(document: document, controller: controller))
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool {

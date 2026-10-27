@@ -3,104 +3,77 @@ import AppKit
 import ScreenCaptureKit
 import FrameletCore
 
+/// A small launcher; the actual workspace is the selected area on screen.
 struct HomeView: View {
     @ObservedObject var controller: AppController
     @ObservedObject var settings: AppSettingsStore
+
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    Image(systemName: "viewfinder").font(.system(size: 29, weight: .medium)).foregroundStyle(Palette.blue)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("拾影").font(.system(size: 23, weight: .semibold, design: .rounded))
-                        Text("FRAMELET").font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(Palette.muted)
-                    }
-                }.padding(.bottom, 42)
-                Label("截图工作台", systemImage: "viewfinder").font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Palette.blue).frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                    .background(Palette.blue.opacity(0.09), in: RoundedRectangle(cornerRadius: 9))
-                Button(action: controller.importImage) { Label("打开图片", systemImage: "photo.on.rectangle").frame(maxWidth: .infinity, alignment: .leading).padding(12) }
-                    .buttonStyle(.plain).padding(.top, 5)
-                Spacer()
-                VStack(alignment: .leading, spacing: 8) {
-                    Image(systemName: "externaldrive.badge.checkmark").font(.system(size: 20)).foregroundStyle(Palette.muted)
-                    Text("你的画面，留在本机。").font(.system(size: 12, weight: .medium))
-                    Text("无需账号，没有订阅。\n只有保存时才写入图片。").font(.system(size: 11)).lineSpacing(4).foregroundStyle(Palette.muted)
-                }.padding(.bottom, 24)
-                Button(action: controller.showSettings) { Label("设置", systemImage: "slider.horizontal.3").font(.system(size: 12)) }.buttonStyle(.plain)
-                Text("0.3.0").font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted).padding(.top, 18)
-            }.padding(24).frame(width: 210).frame(maxHeight: .infinity).background(Palette.paper)
-            Rectangle().fill(Palette.ink.opacity(0.07)).frame(width: 1)
-            VStack(alignment: .leading, spacing: 22) {
-                HStack {
-                    Text("随手一截，留住重点。").font(.system(size: 29, weight: .semibold, design: .rounded)).tracking(-0.7)
-                    Spacer()
-                    Text("本地处理").font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.blue).padding(.horizontal, 10).padding(.vertical, 6).background(Palette.blue.opacity(0.07), in: Capsule())
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(spacing: 12) {
+                Image(systemName: "viewfinder")
+                    .font(.system(size: 27, weight: .medium)).foregroundStyle(Palette.blue)
+                    .frame(width: 48, height: 48).background(Palette.selection, in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("拾影").font(.system(size: 21, weight: .semibold))
+                    Text("截图，标注，随手粘贴。").font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
-                Text("截取画面，标出想法，把重点分享出去。").font(.system(size: 13)).foregroundStyle(Palette.muted).padding(.top, -12)
-                preview.padding(.vertical, 2)
-                HStack(spacing: 12) {
-                    captureButton("区域截图", subtitle: "拖动选择范围", symbol: "viewfinder", shortcut: shortcut(.region), primary: true) { controller.capture(.region) }
-                    captureButton("窗口截图", subtitle: "完整截取一个窗口", symbol: "macwindow", shortcut: shortcut(.window)) { controller.chooseWindow() }
-                    captureButton("全屏截图", subtitle: "鼠标所在的屏幕", symbol: "display", shortcut: shortcut(.fullscreen)) { controller.capture(.full) }
-                }.disabled(controller.busy)
-                HStack(spacing: 6) {
-                    if controller.busy { ProgressView().controlSize(.small); Text("正在准备截图…") }
-                    else { Image(systemName: "keyboard"); Text("快捷键随时可用，关闭此窗口后仍在菜单栏运行。") }
-                }.font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Spacer()
+            }
+            VStack(spacing: 0) {
+                captureRow("区域截图", symbol: "viewfinder", action: .region, primary: true) { controller.capture(.region) }
+                Divider().padding(.leading, 48)
+                captureRow("窗口截图", symbol: "macwindow", action: .window) { controller.chooseWindow() }
+                Divider().padding(.leading, 48)
+                captureRow("全屏截图", symbol: "display", action: .fullscreen) { controller.capture(.full) }
+            }
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.border, lineWidth: 1))
+            .disabled(controller.busy)
+
+            if !controller.permission {
+                Button(action: controller.openPermissionSettings) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "display.trianglebadge.exclamationmark")
+                        Text("截图需要屏幕录制权限").font(.system(size: 11))
+                        Spacer()
+                        Image(systemName: "arrow.up.right").font(.system(size: 10))
+                    }.foregroundStyle(Palette.blue)
+                }.buttonStyle(.plain)
+            }
+            if !controller.shortcutsAvailable {
+                Button("部分快捷键不可用，前往设置查看") { controller.showSettings(tab: 1) }
+                    .font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(.orange)
+            }
+            HStack(spacing: 8) {
+                if controller.busy { ProgressView().controlSize(.mini) }
+                Text(controller.busy ? "正在准备截图…" : "关闭窗口后，仍可通过快捷键截图。")
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
                 Spacer(minLength: 0)
-                HStack {
-                    Text("已有图片？直接打开，继续标注。").font(.system(size: 12)).foregroundStyle(Palette.muted)
-                    Spacer()
-                    Button("打开图片…", action: controller.importImage).buttonStyle(.bordered)
-                }.padding(.top, 12).overlay(alignment: .top) { Divider() }
-            }.padding(32).frame(maxWidth: .infinity, maxHeight: .infinity).background(.white)
-        }.foregroundStyle(Palette.ink).preferredColorScheme(.light)
+                Button(action: controller.showSettings) {
+                    Image(systemName: "gearshape").font(.system(size: 15)).frame(width: 28, height: 28)
+                }.buttonStyle(QuietButtonStyle()).help("设置 · ⌘,").accessibilityLabel("设置")
+            }
+        }
+        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .foregroundStyle(Palette.ink).background(Palette.paper).tint(Palette.blue)
     }
 
-    private func shortcut(_ action: CaptureAction) -> String? {
-        guard let combo = settings.settings.globalShortcuts[action] ?? nil else { return nil }
-        return HotKeyFormat.display(combo)
-    }
-
-    private var preview: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14).fill(Palette.paper)
-            GeometryReader { geometry in
-                Path { path in
-                    for x in stride(from: CGFloat(12), to: geometry.size.width, by: 20) {
-                        for y in stride(from: CGFloat(12), to: geometry.size.height, by: 20) {
-                            path.addEllipse(in: CGRect(x: x, y: y, width: 1.5, height: 1.5))
-                        }
-                    }
-                }.fill(Palette.ink.opacity(0.13))
-            }.clipShape(RoundedRectangle(cornerRadius: 14))
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 5) { ForEach(0..<3) { _ in Circle().fill(Palette.ink.opacity(0.13)).frame(width: 6, height: 6) }; Spacer(); Text("灵感片段").font(.system(size: 10)).foregroundStyle(Palette.muted) }
-                Text("把重点，框出来。").font(.system(size: 24, weight: .semibold, design: .rounded))
-                HStack(spacing: 12) {
-                    Text("截图").padding(.horizontal, 12).padding(.vertical, 7).overlay(RoundedRectangle(cornerRadius: 3).stroke(Palette.blue, lineWidth: 2))
-                    Image(systemName: "arrow.right").foregroundStyle(Palette.blue)
-                    Text("标注").foregroundStyle(Palette.muted)
-                    Image(systemName: "arrow.right").foregroundStyle(Palette.blue)
-                    Text("分享").foregroundStyle(Palette.muted)
-                }.font(.system(size: 12, weight: .medium))
-            }.padding(20).frame(width: 320).background(.white, in: RoundedRectangle(cornerRadius: 10))
-                .shadow(color: Palette.ink.opacity(0.10), radius: 15, x: 0, y: 8).rotationEffect(.degrees(-3))
-            VStack { Spacer(); HStack { Spacer(); Button(action: controller.showDemo) { Label("试试标注", systemImage: "pencil.tip.crop.circle").font(.system(size: 11, weight: .medium)) }.buttonStyle(.bordered).padding(14) } }
-        }.frame(height: 220)
-    }
-
-    private func captureButton(_ title: String, subtitle: String, symbol: String, shortcut: String?, primary: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack { Image(systemName: symbol).font(.system(size: 24, weight: .light)); Spacer(); if let shortcut { Text(shortcut).font(.system(size: 10, design: .monospaced)).opacity(0.65) } }
-                Text(title).font(.system(size: 15, weight: .semibold))
-                Text(subtitle).font(.system(size: 10)).opacity(0.7).lineLimit(1)
-            }.padding(16).frame(maxWidth: .infinity, alignment: .leading).frame(height: 122)
-                .foregroundStyle(primary ? .white : Palette.ink)
-                .background(primary ? Palette.blue : Palette.paper, in: RoundedRectangle(cornerRadius: 12))
-        }.buttonStyle(.plain).accessibilityLabel(title)
+    private func captureRow(_ title: String, symbol: String, action: CaptureAction, primary: Bool = false,
+                            perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol).font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(primary ? Palette.blue : Palette.ink).frame(width: 24)
+                Text(title).font(.system(size: 13, weight: primary ? .semibold : .medium))
+                Spacer()
+                if let combo = settings.settings.globalShortcuts[action] ?? nil {
+                    Text(HotKeyFormat.display(combo)).font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Palette.muted).padding(.horizontal, 7).padding(.vertical, 4)
+                        .background(Palette.paper, in: RoundedRectangle(cornerRadius: 5))
+                }
+            }.padding(.horizontal, 14).frame(height: 58).contentShape(Rectangle())
+        }.buttonStyle(QuietButtonStyle()).accessibilityLabel(title)
     }
 }
 
@@ -127,7 +100,7 @@ struct EditorView: View {
                 Button { controller.pin(document) } label: { Label("贴图", systemImage: "pin") }
                 Button { document.copy() } label: { Label("复制", systemImage: "doc.on.doc") }.help("复制图片 ⌘C")
                 Button { document.save() } label: { Label("保存", systemImage: "square.and.arrow.down") }.buttonStyle(.borderedProminent).tint(Palette.blue).help("保存图片 ⌘S")
-            }.buttonStyle(.bordered).controlSize(.small).padding(12).background(.white)
+            }.buttonStyle(.bordered).controlSize(.small).padding(12).background(Palette.surface)
             HStack(spacing: 10) {
                 Text("颜色").font(.system(size: 11)).foregroundStyle(Palette.muted)
                 ForEach(Array(colors.enumerated()), id: \.offset) { _, color in
@@ -152,8 +125,8 @@ struct EditorView: View {
                 Text("·"); Text("\(document.marks.count) 个标注")
                 Spacer()
                 Text(document.message ?? "图片在本机处理，导出时合并全部标注。")
-            }.font(.system(size: 11)).foregroundStyle(Palette.muted).padding(.horizontal, 16).padding(.vertical, 10).background(.white)
-        }.foregroundStyle(Palette.ink).preferredColorScheme(.light)
+            }.font(.system(size: 11)).foregroundStyle(Palette.muted).padding(.horizontal, 16).padding(.vertical, 10).background(Palette.surface)
+        }.foregroundStyle(Palette.ink)
             .onChange(of: document.ocrText) { _, value in if value != nil { showOCR = true } }
             .sheet(isPresented: $showOCR) {
                 VStack(alignment: .leading, spacing: 16) {
@@ -180,32 +153,60 @@ struct SettingsView: View {
         self.settings = settings
         self.keys = keys
         self.initialTab = initialTab
-        _tab = State(initialValue: initialTab)
+        _tab = State(initialValue: min(3, max(0, initialTab)))
     }
 
+    private let sections: [(title: String, symbol: String, detail: String)] = [
+        ("截图", "viewfinder", "选择截图后的完成方式。"),
+        ("快捷键", "keyboard", "随时截图，快速切换标注工具。"),
+        ("保存", "square.and.arrow.down", "设置图片格式、位置与复制方式。"),
+        ("权限与关于", "info.circle", "屏幕访问权限与应用信息。")
+    ]
+
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $tab) {
-                Text("截图").tag(0); Text("快捷键").tag(1); Text("保存").tag(2); Text("权限与关于").tag(3)
-            }.pickerStyle(.segmented).labelsHidden().padding(16)
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("拾影").font(.system(size: 17, weight: .semibold)).padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 20)
+                ForEach(sections.indices, id: \.self) { index in
+                    Button { tab = index } label: {
+                        Label(sections[index].title, systemImage: sections[index].symbol)
+                            .font(.system(size: 12, weight: tab == index ? .semibold : .regular))
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).frame(height: 36)
+                            .foregroundStyle(tab == index ? Palette.blue : Palette.ink)
+                            .background(tab == index ? Palette.selection : .clear, in: RoundedRectangle(cornerRadius: 7))
+                    }.buttonStyle(QuietButtonStyle()).accessibilityAddTraits(tab == index ? [.isSelected] : [])
+                }
+                Spacer()
+                Text("Framelet 0.3.0").font(.system(size: 10)).foregroundStyle(Palette.muted).padding(12)
+            }.padding(12).frame(width: 162).background(Palette.paper)
             Divider()
             ScrollView {
-                Group {
-                    switch tab {
-                    case 0: captureTab
-                    case 1: shortcutTab
-                    case 2: saveTab
-                    default: permissionTab
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(sections[tab].title).font(.system(size: 22, weight: .semibold))
+                        Text(sections[tab].detail).font(.system(size: 12)).foregroundStyle(Palette.muted)
                     }
-                }.padding(20).frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-        }.background(.white).preferredColorScheme(.light).frame(minWidth: 700, minHeight: 500)
+                    Group {
+                        switch tab {
+                        case 0: captureTab
+                        case 1: shortcutTab
+                        case 2: saveTab
+                        default: permissionTab
+                        }
+                    }
+                    .font(.system(size: 12)).padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.border, lineWidth: 1))
+                }.padding(28).frame(maxWidth: .infinity, alignment: .topLeading)
+            }.background(Palette.paper)
+        }.foregroundStyle(Palette.ink).tint(Palette.blue).frame(minWidth: 760, minHeight: 540)
     }
 
     private var captureTab: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("完成动作").font(.headline)
-            Text("点击「完成」、按 Enter 或在移动状态下双击选区时执行。Cmd+C 始终只复制、不退出截图。").font(.system(size: 11)).foregroundStyle(.secondary)
+            Text("右侧的结束按钮会显示所选动作；也可按 Enter 执行。⌘C 仅复制，保留当前选区。").font(.system(size: 11)).foregroundStyle(.secondary)
             Picker("完成动作", selection: Binding(get: { settings.settings.completionAction }, set: { settings.settings.completionAction = $0 })) {
                 ForEach(CompletionAction.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.radioGroup)
@@ -239,10 +240,10 @@ struct SettingsView: View {
                 }
             }
             Divider()
-            HStack { Text("截图会话工具键").font(.headline); Spacer(); Button("全部恢复默认") { controller.restoreDefaultToolShortcuts() }.controlSize(.small) }
-            Text("截图时直接按这些键切换工具；文字输入期间不会劫持字符键。").font(.system(size: 11)).foregroundStyle(.secondary)
+            HStack { Text("标注工具快捷键").font(.headline); Spacer(); Button("全部恢复默认") { controller.restoreDefaultToolShortcuts() }.controlSize(.small) }
+            Text("截图时直接按这些键切换工具；输入文字时不会切换工具。").font(.system(size: 11)).foregroundStyle(.secondary)
             if let toolError { Text(toolError).font(.caption).foregroundStyle(.orange) }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible())], alignment: .leading, spacing: 8) {
                 ForEach(ToolKeyAction.allCases) { action in
                     HStack {
                         Text(action.title).frame(width: 70, alignment: .leading)
@@ -294,7 +295,7 @@ struct SettingsView: View {
                 Text(notice).font(.caption).foregroundStyle(.orange)
             }
             Text("拾影 · Framelet 0.3.0").font(.system(size: 13, weight: .semibold))
-            Text("macOS 14 或更高版本。截图流程借鉴 iShot 的交互思路，代码与素材均为本产品独立实现。").font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            Text("macOS 14 或更高版本。无需账号，截图与文字识别均在本机完成。").font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
         }
     }
 
@@ -347,7 +348,7 @@ struct WindowPicker: View {
                     }.buttonStyle(.plain)
                 } } }
             }
-        }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(.white).preferredColorScheme(.light)
+        }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Palette.surface)
     }
 }
 

@@ -73,9 +73,34 @@ import FrameletCore
     }
 }
 
+/// Shared semantic colors keep every surface in sync with the macOS appearance.
 enum Palette {
-    static let ink = Color(red: 0.13, green: 0.19, blue: 0.25)
-    static let blue = Color(red: 0.16, green: 0.35, blue: 0.77)
-    static let paper = Color(red: 0.96, green: 0.97, blue: 0.98)
-    static let muted = Color(red: 0.45, green: 0.50, blue: 0.57)
+    static let ink = Color(nsColor: .labelColor)
+    static let blue = Color.accentColor
+    static let paper = Color(nsColor: .windowBackgroundColor)
+    static let surface = Color(nsColor: .controlBackgroundColor)
+    static let muted = Color(nsColor: .secondaryLabelColor)
+    static let border = Color(nsColor: .separatorColor).opacity(0.5)
+    static let selection = Color.accentColor.opacity(0.12)
+}
+
+/// Hover feedback without adding permanent button chrome to compact tool surfaces.
+struct QuietButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    func makeBody(configuration: Configuration) -> some View {
+        QuietButtonBody(configuration: configuration, isEnabled: isEnabled)
+    }
+
+    private struct QuietButtonBody: View {
+        let configuration: ButtonStyleConfiguration
+        let isEnabled: Bool
+        @State private var hovering = false
+        var body: some View {
+            configuration.label
+                .background(Palette.ink.opacity(configuration.isPressed ? 0.10 : hovering && isEnabled ? 0.05 : 0),
+                            in: RoundedRectangle(cornerRadius: 6))
+                .opacity(isEnabled ? 1 : 0.35)
+                .onHover { hovering = $0 }
+        }
+    }
 }

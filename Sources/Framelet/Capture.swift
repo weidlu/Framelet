@@ -670,7 +670,7 @@ private final class RegionView: NSView {
         guard let toolbar, let selection else { return }
         let showProps = document?.tool != nil
         // 44 (main row) + 1 (divider) + 40 (property row) when properties show.
-        let preferred = CGSize(width: 900, height: showProps ? 86 : 45)
+        let preferred = CGSize(width: 664, height: showProps ? 86 : 45)
         let frame = CaptureLayout.toolbarFrame(selection: selection, screen: bounds, preferredSize: preferred)
         toolbar.frame = frame
     }
