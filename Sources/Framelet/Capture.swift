@@ -438,7 +438,7 @@ private final class RegionView: NSView {
     private func refreshSelectionUI() {
         selectionChrome.frame = bounds
         selectionChrome.selection = selection
-        selectionChrome.pixelSize = document?.selectionPixelRect.size ?? selection.map { CGSize(width: $0.width * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize), height: $0.height * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) } ?? .zero
+        selectionChrome.pixelSize = document.map { CGSize(width: $0.pixelWidth, height: $0.pixelHeight) } ?? selection.map { CGSize(width: $0.width * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize), height: $0.height * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) } ?? .zero
         selectionChrome.showHandles = document != nil && document?.tool == nil
         selectionChrome.isHidden = selection == nil
         needsDisplay = true
@@ -555,8 +555,8 @@ private final class RegionView: NSView {
     private func applySelection(_ rect: CGRect) {
         start = rect.origin
         current = CGPoint(x: rect.maxX, y: rect.maxY)
-        canvas?.frame = rect
         document?.selectionPixelRect = CaptureGeometry.pixelRect(rect, viewBounds: bounds, imageSize: imageSize)
+        canvas?.needsDisplay = true
         refreshSelectionUI()
     }
 
@@ -607,7 +607,8 @@ private final class RegionView: NSView {
         }
         let canvas = CaptureCanvasView(document: doc)
         canvas.drawingEnabled = false
-        canvas.frame = rect
+        canvas.frame = bounds
+        canvas.autoresizingMask = [.width, .height]
         self.canvas = canvas
         canvas.onCancel = { [weak self] in self?.handleCancelRequest() }
         addSubview(canvas, positioned: .below, relativeTo: selectionChrome)
@@ -644,7 +645,7 @@ private final class RegionView: NSView {
         if start != rect.origin || current != CGPoint(x: rect.maxX, y: rect.maxY) {
             start = rect.origin
             current = CGPoint(x: rect.maxX, y: rect.maxY)
-            canvas?.frame = rect
+            canvas?.needsDisplay = true
             refreshSelectionUI()
         }
     }

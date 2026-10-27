@@ -118,24 +118,18 @@ public enum Imaging {
 
     /// Renders the full screenshot cropped to `selectionPixelRect` (bottom-left
     /// image pixel coordinates). Marks live in full-image coordinates; they are
-    /// translated so the selection origin maps to (0,0) and are clipped to the
-    /// selection, so marks outside the selection are cropped on export.
+    /// composited before cropping to integral device-pixel boundaries. Marks
+    /// outside the selection are cropped away without resampling its pixels.
     public static func renderCropped(_ image: CGImage, marks: [Mark], selectionPixelRect: CGRect) throws -> CGImage {
         let selection = selectionPixelRect.standardized
             .intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
         guard !selection.isNull, selection.width >= 1, selection.height >= 1 else { throw ImagingError.render }
-        let width = max(1, Int(selection.width.rounded())), height = max(1, Int(selection.height.rounded()))
-        guard let ctx = context(width: width, height: height) else { throw ImagingError.render }
         let crop = CaptureGeometry.cropRect(selection, imageSize: CGSize(width: image.width, height: image.height))
-        guard let piece = image.cropping(to: crop) else { throw ImagingError.render }
-        ctx.draw(piece, in: CGRect(x: 0, y: 0, width: selection.width, height: selection.height))
-        let offset = CGPoint(x: selection.minX, y: selection.minY)
-        let clip = CGRect(x: 0, y: 0, width: selection.width, height: selection.height)
-        for mark in marks {
-            let source = mark.tool == .pixelate ? (ctx.makeImage() ?? piece) : piece
-            draw(mark, on: ctx, base: source, offset: offset, clip: clip)
-        }
-        guard let output = ctx.makeImage() else { throw ImagingError.render }
+        // Render in fixed full-image coordinates, then take the actual device
+        // pixels. Never squeeze an integral crop into fractional dimensions:
+        // doing so resamples screenshot text every time the selection moves.
+        let composite = marks.isEmpty ? image : try render(image, marks: marks)
+        guard let output = composite.cropping(to: crop) else { throw ImagingError.render }
         return output
     }
 

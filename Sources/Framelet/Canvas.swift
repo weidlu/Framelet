@@ -140,8 +140,8 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     }
 }
 
-/// In-place capture canvas. Renders exactly what will be exported (cropped
-/// selection plus marks in full-image coordinates) so preview and paste match.
+/// Fixed display-sized canvas. Selection changes the clip, never the view's
+/// geometry or the screenshot's scale. Export crops this same composite.
 final class CaptureCanvasView: NSView, NSTextFieldDelegate {
     let document: CaptureDocument
     var drawingEnabled = true
@@ -162,24 +162,32 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     override var acceptsFirstResponder: Bool { true }
-    override func resetCursorRects() {
-        addCursorRect(bounds, cursor: drawingEnabled ? (document.tool == .text ? .iBeam : .crosshair) : .openHand)
+    private var selectionBounds: CGRect {
+        CaptureGeometry.viewRect(document.selectionPixelRect, viewBounds: bounds,
+                                 imageSize: CGSize(width: document.fullImage.width, height: document.fullImage.height))
     }
-    override func hitTest(_ point: NSPoint) -> NSView? { drawingEnabled ? super.hitTest(point) : nil }
+    override func resetCursorRects() {
+        addCursorRect(selectionBounds, cursor: drawingEnabled ? (document.tool == .text ? .iBeam : .crosshair) : .openHand)
+    }
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard drawingEnabled, selectionBounds.contains(convert(point, from: superview)) else { return nil }
+        return super.hitTest(point)
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let marks = document.marks + (pending.map { [$0] } ?? [])
-        let output = ((try? Imaging.renderCropped(document.fullImage, marks: marks, selectionPixelRect: document.selectionPixelRect)) ?? document.fullImage)
-        ctx.interpolationQuality = .high
+        ctx.clear(bounds)
+        ctx.saveGState(); defer { ctx.restoreGState() }
+        ctx.clip(to: selectionBounds)
+        let output = (try? document.previewImage(pending: pending)) ?? document.fullImage
+        ctx.interpolationQuality = .none
         ctx.draw(output, in: bounds)
     }
 
     private func imagePoint(_ event: NSEvent) -> CGPoint {
         let local = convert(event.locationInWindow, from: nil)
         return CaptureInteraction.clamped(
-            CGPoint(x: (local.x + frame.origin.x) * document.scale,
-                    y: (local.y + frame.origin.y) * document.scale),
+            CGPoint(x: local.x * document.scale, y: local.y * document.scale),
             to: document.selectionPixelRect)
     }
 
@@ -223,10 +231,11 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
 
     private func beginText(at point: CGPoint, viewPoint: CGPoint) {
         commitText()
-        let width = min(280, bounds.width)
-        let height = min(34, bounds.height)
-        let field = NSTextField(frame: CGRect(x: min(max(0, viewPoint.x), max(0, bounds.width-width)),
-                                             y: min(max(0, viewPoint.y-10), max(0, bounds.height-height)), width: width, height: height))
+        let area = selectionBounds
+        let width = min(280, area.width)
+        let height = min(34, area.height)
+        let field = NSTextField(frame: CGRect(x: min(max(area.minX, viewPoint.x), area.maxX-width),
+                                             y: min(max(area.minY, viewPoint.y-10), area.maxY-height), width: width, height: height))
         field.placeholderString = "输入文字，回车确认"
         field.font = .systemFont(ofSize: max(11, document.fontSize / document.scale), weight: .semibold)
         field.textColor = document.color

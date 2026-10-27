@@ -31,6 +31,7 @@ import FrameletCore
             ("选区到像素坐标映射",cropGeometry),
             ("八点调整手柄几何",eightHandles),
             ("裁剪渲染保持标注锚点",croppedRenderKeepsAnchor),
+            ("小数像素选区裁剪保持原始像素",fractionalCropPreservesPixels),
             ("完成动作策略矩阵",completionPolicyMatrix),
             ("剪贴板同时写入 PNG 与 TIFF",pasteboardWritesPNGAndTIFF),
             ("JPEG 展平透明背景",jpegFlattensTransparency),
@@ -47,6 +48,25 @@ import FrameletCore
     static func retinaCrop() throws {
         let rect = Imaging.cropRect(selection: CGRect(x: 100,y: 50,width: 300,height: 200),screenSize: CGSize(width: 1000,height: 600),imageSize: CGSize(width: 2000,height: 1200))
         try expect(rect == CGRect(x: 200,y: 700,width: 600,height: 400),"Retina crop coordinates")
+    }
+    static func fractionalCropPreservesPixels() throws {
+        let ctx = try unwrap(Imaging.context(width: 64, height: 64))
+        for x in 0..<64 {
+            ctx.setFillColor((x.isMultiple(of: 2) ? NSColor.black : NSColor.white).cgColor)
+            ctx.fill(CGRect(x: x, y: 0, width: 1, height: 64))
+        }
+        let source = try unwrap(ctx.makeImage())
+        // Dragging can land between device pixels. Cropping must include those
+        // pixels without squeezing the integral crop into a fractional width.
+        for selection in [CGRect(x: 5.25, y: 6.25, width: 30.5, height: 20.5),
+                          CGRect(x: 6.75, y: 9.5, width: 28.25, height: 18.25)] {
+            let crop = CaptureGeometry.cropRect(selection, imageSize: CGSize(width: 64, height: 64))
+            let output = try Imaging.renderCropped(source, marks: [], selectionPixelRect: selection)
+            try expect(output.width == Int(crop.width) && output.height == Int(crop.height), "fractional crop must retain the full pixel extent")
+            for x in 2..<(output.width - 2) {
+                try expect(pixel(output, x: x, y: 5) == pixel(source, x: Int(crop.minX) + x, y: Int(crop.minY) + 5), "cropping resampled a sharp screenshot pixel at x=\(x)")
+            }
+        }
     }
     static func clampedCrop() throws {
         let rect = Imaging.cropRect(selection: CGRect(x: -10,y: -20,width: 110,height: 120),screenSize: CGSize(width: 1000,height: 600),imageSize: CGSize(width: 2000,height: 1200))

@@ -16,7 +16,10 @@ import FrameletCore
     /// Selection in full-image pixel coordinates (bottom-left origin), updated
     /// by the overlay as the selection moves/resizes.
     @Published var selectionPixelRect: CGRect = .zero
-    @Published private(set) var marks: [Mark] = []
+    @Published private(set) var marks: [Mark] = [] {
+        didSet { cachedPreview = nil }
+    }
+    private var cachedPreview: CGImage?
     @Published var tool: MarkTool? = nil
     @Published var color: NSColor
     @Published var strokeWidth: CGFloat
@@ -43,8 +46,11 @@ import FrameletCore
         self.fontSize = fontSize
     }
 
-    var pixelWidth: Int { max(1, Int(selectionPixelRect.width.rounded())) }
-    var pixelHeight: Int { max(1, Int(selectionPixelRect.height.rounded())) }
+    private var exportPixelRect: CGRect {
+        CaptureGeometry.cropRect(selectionPixelRect, imageSize: CGSize(width: fullImage.width, height: fullImage.height))
+    }
+    var pixelWidth: Int { max(1, Int(exportPixelRect.width)) }
+    var pixelHeight: Int { max(1, Int(exportPixelRect.height)) }
 
     /// Marks the document as discarded so late OCR results cannot reopen UI for
     /// a session that already ended.
@@ -81,7 +87,17 @@ import FrameletCore
     var canUndo: Bool { !undoStack.isEmpty }
 
     func flattened() throws -> CGImage {
-        try Imaging.renderCropped(fullImage, marks: marks, selectionPixelRect: selectionPixelRect)
+        try Imaging.renderCropped(previewImage(), marks: [], selectionPixelRect: selectionPixelRect)
+    }
+
+    /// Full-resolution composite anchored to the display. Selection geometry
+    /// changes only the clip; moving/resizing must not move or resize pixels.
+    func previewImage(pending: Mark? = nil) throws -> CGImage {
+        if let pending { return try Imaging.render(fullImage, marks: marks + [pending]) }
+        if let cachedPreview { return cachedPreview }
+        let image = marks.isEmpty ? fullImage : try Imaging.render(fullImage, marks: marks)
+        cachedPreview = image
+        return image
     }
 
     @discardableResult
