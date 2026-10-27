@@ -14,32 +14,52 @@ import FrameletCore
     }
 }
 
+enum SessionState: Equatable { case idle, preparing, selecting, editing, committing }
+
 @MainActor final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var busy = false
     @Published var permission = CGPreflightScreenCaptureAccess()
+    @Published var sessionState: SessionState = .idle
     @Published var shortcutsAvailable = true
-    private let captureService = CaptureService()
-    private let keys = HotKeys()
+    @Published var hotKeyFailures: [CaptureAction: String] = [:]
+    let settings: AppSettingsStore
+    private let captureService: CaptureService
+    private let keys = HotKeyRegistry()
     private var home: NSWindow?
-    private var settings: NSWindow?
+    private var settingsWindow: NSWindow?
     private var picker: NSWindow?
     private var statusItem: NSStatusItem?
     private var editors: [EditorWindow] = []
     private var pins: [NSWindow] = []
+
+    override init() {
+        settings = AppSettingsStore()
+        captureService = CaptureService(settings: settings)
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem?.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "拾影")
         statusItem?.menu = captureMenu()
-        keys.onTrigger = { [weak self] id in self?.capture(id == 1 ? .region : .full) }
-        shortcutsAvailable = keys.register()
+        keys.onTrigger = { [weak self] action in self?.run(action) }
+        captureService.onPhase = { [weak self] phase in
+            switch phase {
+            case .selecting: self?.sessionState = .selecting
+            case .editing: self?.sessionState = .editing
+            case .committing: self?.sessionState = .committing
+            }
+        }
+        applyHotKeys()
         showHome()
         if ProcessInfo.processInfo.arguments.contains("--demo") { showDemo() }
     }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showHome(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if sessionState != .idle { return .terminateCancel }
         if editors.contains(where: { $0.document.hasUnsavedMarks }) {
             let alert = NSAlert(); alert.messageText = "退出拾影？"; alert.informativeText = "尚未保存的标注将丢失。"
             alert.addButton(withTitle: "取消"); alert.addButton(withTitle: "退出")
@@ -47,24 +67,38 @@ import FrameletCore
         }
         return .terminateNow
     }
+    func applicationWillTerminate(_ notification: Notification) { keys.unregisterAll() }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls { do { openImage(try Imaging.load(url), name: url.lastPathComponent) } catch { showError(error) } }
     }
+
+    // MARK: Menu
     private func buildMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于拾影", action: #selector(about), keyEquivalent: "")
+        appMenu.addItem(withTitle: "设置…", action: #selector(showSettings), keyEquivalent: ",")
         appMenu.addItem(withTitle: "打开工作台", action: #selector(showHome), keyEquivalent: "1")
-        appMenu.addItem(withTitle: "权限与快捷键…", action: #selector(showSettings), keyEquivalent: ",")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "隐藏拾影", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "退出拾影", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu; main.addItem(appItem)
+
+        let captureItem = NSMenuItem(); captureItem.title = "截图"
+        let captureSubmenu = NSMenu(title: "截图")
+        captureSubmenu.addItem(withTitle: "区域截图", action: #selector(regionAction), keyEquivalent: "")
+        captureSubmenu.addItem(withTitle: "全屏截图", action: #selector(fullAction), keyEquivalent: "")
+        captureSubmenu.addItem(withTitle: "窗口截图…", action: #selector(windowAction), keyEquivalent: "")
+        captureSubmenu.addItem(withTitle: "上次区域截图", action: #selector(lastRegionAction), keyEquivalent: "")
+        captureItem.submenu = captureSubmenu; main.addItem(captureItem)
+
         let file = NSMenuItem(); file.title = "文件"; let fileMenu = NSMenu(title: "文件")
         fileMenu.addItem(withTitle: "打开图片…", action: #selector(importImage), keyEquivalent: "o")
         fileMenu.addItem(withTitle: "保存图片…", action: #selector(saveCurrent), keyEquivalent: "s")
         fileMenu.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         file.submenu = fileMenu; main.addItem(file)
+
         let edit = NSMenuItem(); edit.title = "编辑"; let editMenu = NSMenu(title: "编辑")
         editMenu.addItem(withTitle: "撤销标注", action: #selector(undoCurrent), keyEquivalent: "z")
         let redo = editMenu.addItem(withTitle: "重做标注", action: #selector(redoCurrent), keyEquivalent: "z"); redo.keyEquivalentModifierMask = [.command, .shift]
@@ -75,65 +109,184 @@ import FrameletCore
         editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         edit.submenu = editMenu; main.addItem(edit)
         NSApp.mainMenu = main
+        refreshCaptureMenuItems()
     }
+
+    private func refreshCaptureMenuItems() {
+        guard let submenu = NSApp.mainMenu?.items.first(where: { $0.title == "截图" })?.submenu else { return }
+        let titles: [(CaptureAction, String)] = [(.region, "区域截图"), (.fullscreen, "全屏截图"), (.window, "窗口截图…"), (.lastRegion, "上次区域截图")]
+        for (index, (action, title)) in titles.enumerated() {
+            guard index < submenu.items.count else { continue }
+            let item = submenu.items[index]
+            item.title = shortcutSuffix(action).map { "\(title)  \($0)" } ?? title
+        }
+        statusItem?.menu = captureMenu()
+    }
+
+    private func shortcutSuffix(_ action: CaptureAction) -> String? {
+        guard let combo = settings.settings.globalShortcuts[action] ?? nil else { return nil }
+        return HotKeyFormat.display(combo)
+    }
+
     private func captureMenu() -> NSMenu {
         let menu = NSMenu()
-        let entries: [(String, Selector)] = [("区域截图  ⌃⌥4", #selector(regionAction)), ("全屏截图  ⌃⌥3", #selector(fullAction)), ("窗口截图…", #selector(windowAction)), ("打开图片…", #selector(importImage))]
-        for (title, action) in entries { let item = menu.addItem(withTitle: title, action: action, keyEquivalent: ""); item.target = self }
+        let entries: [(String, Selector)] = [
+            (menuTitle("区域截图", .region), #selector(regionAction)),
+            (menuTitle("全屏截图", .fullscreen), #selector(fullAction)),
+            (menuTitle("窗口截图", .window), #selector(windowAction)),
+            (menuTitle("上次区域截图", .lastRegion), #selector(lastRegionAction)),
+        ]
+        for (title, action) in entries {
+            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
+            item.target = self
+        }
         menu.addItem(.separator())
-        let item = menu.addItem(withTitle: "打开拾影", action: #selector(showHome), keyEquivalent: ""); item.target = self
-        let quit = menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"); quit.target = NSApp
+        menu.addItem(withTitle: "打开图片…", action: #selector(importImage), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "打开拾影", action: #selector(showHome), keyEquivalent: "").target = self
+        let quit = menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
         return menu
     }
-    @objc func showHome() {
-        guard !busy else { return }
-        if home == nil {
-            let window = makeWindow(title: "拾影 · Framelet", size: CGSize(width: 960, height: 660))
-            window.minSize = CGSize(width: 900, height: 640)
-            window.contentView = NSHostingView(rootView: HomeView(controller: self))
-            home = window
+
+    private func menuTitle(_ title: String, _ action: CaptureAction) -> String {
+        shortcutSuffix(action).map { "\(title)  \($0)" } ?? title
+    }
+
+    // MARK: Hot keys
+    private func applyHotKeys() {
+        let failures = keys.registerAll(settings.settings.globalShortcuts)
+        hotKeyFailures = failures
+        shortcutsAvailable = failures.isEmpty
+        refreshCaptureMenuItems()
+    }
+
+    func rebindHotKey(_ action: CaptureAction, to combo: HotKeyCombo?) {
+        do {
+            if let combo {
+                try keys.rebind(action: action, to: combo)
+                settings.settings.globalShortcuts[action] = combo
+            } else {
+                keys.clear(action: action)
+                settings.settings.globalShortcuts[action] = nil
+            }
+            hotKeyFailures = [:]
+        } catch {
+            showShortcutError(action: action, error: error)
         }
-        home?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        shortcutsAvailable = keysAvailable
+        refreshCaptureMenuItems()
     }
-    @objc func showSettings() {
-        permission = CGPreflightScreenCaptureAccess()
-        if settings == nil {
-            let window = makeWindow(title: "权限与快捷键", size: CGSize(width: 520, height: 440))
-            window.contentView = NSHostingView(rootView: SettingsView(controller: self)); settings = window
+
+    private var keysAvailable: Bool {
+        hotKeyFailures.isEmpty
+    }
+
+    private func showShortcutError(action: CaptureAction, error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "无法设置「\(action.title)」的快捷键"
+        alert.informativeText = error.localizedDescription
+        alert.addButton(withTitle: "知道了")
+        alert.runModal()
+    }
+
+    func setRecording(_ recording: Bool) {
+        if recording {
+            // Suspend global capture triggers while a recorder captures keys.
+            keys.registerAll([:])
+        } else {
+            applyHotKeys()
         }
-        settings?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
-    func openPermissionSettings() {
-        _ = CGRequestScreenCaptureAccess()
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") { NSWorkspace.shared.open(url) }
+
+    func restoreDefaultGlobalShortcuts() {
+        settings.settings.globalShortcuts = AppSettings.defaultGlobalShortcuts
+        applyHotKeys()
     }
-    @objc func importImage() {
-        let panel = NSOpenPanel(); panel.allowedContentTypes = [.png, .jpeg, .tiff]; panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { openImage(try Imaging.load(url), name: url.lastPathComponent) } catch { showError(error) }
+
+    func restoreDefaultToolShortcuts() {
+        settings.settings.toolShortcuts = AppSettings.defaultToolShortcuts
     }
+
+    // MARK: Capture routing
+    private func run(_ action: CaptureAction) {
+        switch action {
+        case .region: capture(.region)
+        case .fullscreen: capture(.full)
+        case .window: chooseWindow()
+        case .lastRegion: captureLastRegion()
+        }
+    }
+
+    enum Mode { case region, full }
+
     @objc private func regionAction() { capture(.region) }
     @objc private func fullAction() { capture(.full) }
     @objc private func windowAction() { chooseWindow() }
-    enum Mode { case region, full }
+    @objc private func lastRegionAction() { captureLastRegion() }
+
     func capture(_ mode: Mode) {
-        guard !busy else { return }
+        guard sessionState == .idle else { return }
+        startCapture { try await self.captureService.region(selectFullScreen: mode == .full) }
+    }
+
+    private func captureLastRegion() {
+        guard sessionState == .idle else { return }
+        guard let last = settings.settings.lastRegion else {
+            let alert = NSAlert(); alert.messageText = "没有可用的上次区域"
+            alert.informativeText = "请先完成一次区域截图，之后才能使用「上次区域截图」。"
+            alert.addButton(withTitle: "知道了"); alert.runModal()
+            return
+        }
+        startCapture { try await self.captureService.lastRegionCapture(last) }
+    }
+
+    private func startCapture(_ operation: @escaping () async throws -> CaptureOutcome) {
+        sessionState = .preparing
         busy = true
+        let previousFrontmost = NSWorkspace.shared.frontmostApplication
         let visible = NSApp.windows.filter { $0.isVisible && !pins.contains($0) }
         visible.forEach { $0.orderOut(nil) }
         Task {
-            defer { busy = false; permission = CGPreflightScreenCaptureAccess() }
+            defer { sessionState = .idle; busy = false; permission = CGPreflightScreenCaptureAccess() }
             do {
-                try await Task.sleep(nanoseconds: 180_000_000)
-                let outcome = try await captureService.region(selectFullScreen: mode == .full)
-                handleCapture(outcome,restoring:visible)
-            } catch { visible.forEach { $0.orderFront(nil) }; showError(error) }
+                try await Task.sleep(nanoseconds: 200_000_000)
+                sessionState = .selecting
+                let outcome = try await operation()
+                handleCapture(outcome, restoring: visible, previousFrontmost: previousFrontmost)
+            } catch {
+                visible.forEach { $0.orderFront(nil) }
+                restoreFrontmost(previousFrontmost)
+                showError(error)
+            }
         }
     }
+
+    private func handleCapture(_ outcome: CaptureOutcome, restoring visible: [NSWindow], previousFrontmost: NSRunningApplication?) {
+        switch outcome {
+        case .cancelled:
+            visible.forEach { $0.orderFront(nil) }
+            restoreFrontmost(previousFrontmost)
+        case .finished(let lastRegion):
+            if let lastRegion { settings.settings.lastRegion = lastRegion }
+            restoreFrontmost(previousFrontmost)
+        case .pinned(let image, let name, let lastRegion):
+            if let lastRegion { settings.settings.lastRegion = lastRegion }
+            pin(image, name: name)
+            restoreFrontmost(previousFrontmost)
+        }
+    }
+
+    private func restoreFrontmost(_ app: NSRunningApplication?) {
+        guard let app, app.processIdentifier != ProcessInfo.processInfo.processIdentifier, !app.isTerminated else { return }
+        app.activate(options: [.activateIgnoringOtherApps])
+    }
+
+    // MARK: Window / picker
     func chooseWindow() {
-        guard !busy else { return }; busy = true
+        guard sessionState == .idle else { return }
+        busy = true
         Task {
-            defer { busy = false; permission = CGPreflightScreenCaptureAccess() }
+            defer { busy = false }
             do {
                 let windows = try await captureService.windows()
                 let window = makeWindow(title: "选择要截图的窗口", size: CGSize(width: 580, height: 500))
@@ -144,40 +297,70 @@ import FrameletCore
             } catch { showError(error) }
         }
     }
+
     private func captureWindow(_ window: SCWindow) {
-        guard !busy else { return }; busy = true
-        let visible = NSApp.windows.filter { $0.isVisible && !pins.contains($0) }
-        visible.forEach { $0.orderOut(nil) }
-        Task {
-            defer { busy = false }
-            do { handleCapture(try await captureService.region(window:window),restoring:visible) }
-            catch { visible.forEach { $0.orderFront(nil) }; showError(error) }
+        guard sessionState == .idle else { return }
+        startCapture { try await self.captureService.region(window: window) }
+    }
+
+    // MARK: Home / settings / pin / image
+    @objc func showHome() {
+        guard sessionState == .idle else { return }
+        if home == nil {
+            let window = makeWindow(title: "拾影 · Framelet", size: CGSize(width: 960, height: 660))
+            window.minSize = CGSize(width: 900, height: 640)
+            window.contentView = NSHostingView(rootView: HomeView(controller: self))
+            home = window
+        }
+        home?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc func showSettings() {
+        permission = CGPreflightScreenCaptureAccess()
+        if settingsWindow == nil {
+            let window = makeWindow(title: "拾影设置", size: CGSize(width: 760, height: 560))
+            window.minSize = CGSize(width: 700, height: 520)
+            window.contentView = NSHostingView(rootView: SettingsView(controller: self, settings: settings, keys: keys))
+            settingsWindow = window
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func openPermissionSettings() {
+        _ = CGRequestScreenCaptureAccess()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
         }
     }
-    private func handleCapture(_ outcome: CaptureOutcome, restoring visible: [NSWindow]) {
-        switch outcome {
-        case .cancelled: visible.forEach { $0.orderFront(nil) }
-        case .finished: break
-        case .pinned(let document): pin(document)
-        }
+
+    @objc func importImage() {
+        let panel = NSOpenPanel(); panel.allowedContentTypes = [.png, .jpeg, .tiff]; panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { openImage(try Imaging.load(url), name: url.lastPathComponent) } catch { showError(error) }
     }
+
     func openImage(_ image: CGImage, name: String) {
         let editor = EditorWindow(document: ImageDocument(image: image, name: name), controller: self)
         editor.onClose = { [weak self, weak editor] in self?.editors.removeAll { $0 === editor } }
         editors.append(editor); editor.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
+
     func pin(_ document: ImageDocument) {
-        do {
-            let image = try document.flattened()
-            let window = NSPanel(contentRect: CGRect(x: 0, y: 0, width: min(640,CGFloat(image.width)/2), height: min(500,CGFloat(image.height)/2)),
-                                 styleMask: [.titled,.closable,.resizable,.utilityWindow], backing: .buffered, defer: false)
-            window.title = "贴图 · \(document.name)"; window.level = .floating; window.isReleasedWhenClosed = false
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            let view = NSImageView(); view.image = NSImage(cgImage: image, size: .zero); view.imageScaling = .scaleProportionallyUpOrDown
-            window.contentView = view; window.center(); window.makeKeyAndOrderFront(nil)
-            pins.removeAll { !$0.isVisible }; pins.append(window)
-        } catch { showError(error) }
+        do { pin(try document.flattened(), name: document.name) } catch { showError(error) }
     }
+
+    func pin(_ image: CGImage, name: String) {
+        let width = min(640, CGFloat(image.width) / 2)
+        let height = min(500, CGFloat(image.height) / 2)
+        let window = NSPanel(contentRect: CGRect(x: 0, y: 0, width: max(120, width), height: max(120, height)),
+                             styleMask: [.titled, .closable, .resizable, .utilityWindow], backing: .buffered, defer: false)
+        window.title = "贴图 · \(name)"; window.level = .floating; window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        let view = NSImageView(); view.image = NSImage(cgImage: image, size: .zero); view.imageScaling = .scaleProportionallyUpOrDown
+        window.contentView = view; window.center(); window.makeKeyAndOrderFront(nil)
+        pins.removeAll { !$0.isVisible }; pins.append(window)
+    }
+
     private var currentDocument: ImageDocument? { (NSApp.keyWindow as? EditorWindow)?.document }
     @objc private func saveCurrent() { currentDocument?.save() }
     @objc private func undoCurrent() {
@@ -193,20 +376,23 @@ import FrameletCore
         else { currentDocument?.copy() }
     }
     @objc private func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "拾影 · Framelet", .applicationVersion: "0.2.0", .credits: NSAttributedString(string: "截图，留住重点。\n本地处理 · 无账号 · 无付费墙")])
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "拾影 · Framelet", .applicationVersion: "0.3.0", .credits: NSAttributedString(string: "截图，留住重点。\n本地处理 · 无账号 · 无付费墙")])
     }
+
     func showError(_ error: Error) {
         let alert = NSAlert(); alert.messageText = "未能完成操作"; alert.informativeText = error.localizedDescription
         alert.addButton(withTitle: "知道了")
         if !CGPreflightScreenCaptureAccess() { alert.addButton(withTitle: "打开权限设置") }
         if alert.runModal() == .alertSecondButtonReturn { openPermissionSettings() }
     }
+
     private func makeWindow(title: String, size: CGSize) -> NSWindow {
-        let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.titled,.closable,.miniaturizable,.resizable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = title; window.isReleasedWhenClosed = false; window.center()
         window.appearance = NSAppearance(named: .aqua)
         return window
     }
+
     func showDemo() {
         guard let image = DemoImage.make() else { return }
         openImage(image, name: "示例画布")
@@ -218,7 +404,7 @@ import FrameletCore
     var onClose: (() -> Void)?
     init(document: ImageDocument, controller: AppController) {
         self.document = document
-        super.init(contentRect: CGRect(x: 0, y: 0, width: 1120, height: 780), styleMask: [.titled,.closable,.miniaturizable,.resizable], backing: .buffered, defer: false)
+        super.init(contentRect: CGRect(x: 0, y: 0, width: 1120, height: 780), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         title = "\(document.name) · 拾影"; minSize = CGSize(width: 1060, height: 600)
         isReleasedWhenClosed = false; delegate = self; appearance = NSAppearance(named: .aqua); center()
         contentView = NSHostingView(rootView: EditorView(document: document, controller: controller))

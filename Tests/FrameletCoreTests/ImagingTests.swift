@@ -22,7 +22,13 @@ import FrameletCore
             ("拒绝不可分配的图像尺寸",allocationBounds),
             ("悬浮工具栏优先放在选区下方",toolbarBelow),
             ("底部选区工具栏翻到上方",toolbarAbove),
-            ("全屏和窄屏工具栏保持可操作",toolbarClamped)
+            ("全屏和窄屏工具栏保持可操作",toolbarClamped),
+            ("设置默认值与类型安全",settingsDefaults),
+            ("设置往返与坏值修复",settingsRoundTripAndRepair),
+            ("全局快捷键合法性",globalShortcutValidation),
+            ("选区到像素坐标映射",cropGeometry),
+            ("八点调整手柄几何",eightHandles),
+            ("裁剪渲染保持标注锚点",croppedRenderKeepsAnchor)
         ]
         for (name,run) in checks { try run(); print("PASS \(name)") }
         print("\(checks.count) 项检查全部通过")

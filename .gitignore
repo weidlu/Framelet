@@ -5,3 +5,7 @@ dist/
 *.dmg
 *.zip
 *.xcuserstate
+
+# Local agent/scratch material
+.pi/
+work/

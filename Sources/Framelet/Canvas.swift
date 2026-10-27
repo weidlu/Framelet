@@ -120,3 +120,102 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         return false
     }
 }
+
+/// In-place capture canvas. Renders exactly what will be exported (cropped
+/// selection plus marks in full-image coordinates) so preview and paste match.
+final class CaptureCanvasView: NSView, NSTextFieldDelegate {
+    let document: CaptureDocument
+    var drawingEnabled = true
+    private var pending: Mark?
+    private var textField: NSTextField?
+    private var textPosition: CGPoint?
+    private var observation: AnyCancellable?
+
+    init(document: CaptureDocument) {
+        self.document = document
+        super.init(frame: .zero)
+        observation = document.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.needsDisplay = true }
+        }
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+    override var acceptsFirstResponder: Bool { true }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: drawingEnabled ? .crosshair : .openHand) }
+    override func hitTest(_ point: NSPoint) -> NSView? { drawingEnabled ? super.hitTest(point) : nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let marks = document.marks + (pending.map { [$0] } ?? [])
+        let output = ((try? Imaging.renderCropped(document.fullImage, marks: marks, selectionPixelRect: document.selectionPixelRect)) ?? document.fullImage)
+        ctx.interpolationQuality = .high
+        ctx.draw(output, in: bounds)
+    }
+
+    private func imagePoint(_ event: NSEvent) -> CGPoint {
+        let local = convert(event.locationInWindow, from: nil)
+        return CGPoint(x: (local.x + frame.origin.x) * document.scale,
+                       y: (local.y + frame.origin.y) * document.scale)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard drawingEnabled else { return }
+        window?.makeFirstResponder(self)
+        let p = imagePoint(event)
+        if document.tool == .text {
+            beginText(at: p, viewPoint: convert(event.locationInWindow, from: nil))
+            return
+        }
+        pending = Mark(tool: document.tool ?? .arrow, points: [p, p], color: document.color, width: document.strokeWidth)
+    }
+    override func mouseDragged(with event: NSEvent) {
+        guard var mark = pending else { return }
+        if mark.tool == .pen { mark.points.append(imagePoint(event)) } else { mark.points[mark.points.count-1] = imagePoint(event) }
+        pending = mark; needsDisplay = true
+    }
+    override func mouseUp(with event: NSEvent) {
+        guard let mark = pending else { return }
+        pending = nil
+        if let first = mark.points.first, let last = mark.points.last, hypot(last.x-first.x, last.y-first.y) > 2 {
+            document.append(mark)
+        }
+        needsDisplay = true
+    }
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { pending = nil; needsDisplay = true } else { super.keyDown(with: event) }
+    }
+
+    private func beginText(at point: CGPoint, viewPoint: CGPoint) {
+        commitText()
+        let width = min(280, max(90, bounds.width-viewPoint.x))
+        let field = NSTextField(frame: CGRect(x: min(viewPoint.x, max(0, bounds.width-width)), y: max(0, viewPoint.y-10), width: width, height: 34))
+        field.placeholderString = "输入文字，回车确认"
+        field.font = .systemFont(ofSize: max(11, document.fontSize / 2), weight: .semibold)
+        field.textColor = document.color
+        field.delegate = self
+        field.backgroundColor = .white; field.isBezeled = true
+        textPosition = point; textField = field
+        addSubview(field); window?.makeFirstResponder(field)
+    }
+
+    func commitText() {
+        guard let field = textField else { return }
+        let value = field.stringValue
+        let point = textPosition
+        textField = nil; textPosition = nil
+        field.delegate = nil; field.removeFromSuperview()
+        if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let point {
+            document.append(Mark(tool: .text, points: [point], color: document.color, width: document.strokeWidth, fontSize: document.fontSize, text: value))
+        }
+        needsDisplay = true
+    }
+    func controlTextDidEndEditing(_ notification: Notification) { commitText() }
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+            textField?.stringValue = ""; commitText(); window?.makeFirstResponder(self); return true
+        }
+        if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+            commitText(); window?.makeFirstResponder(self); return true
+        }
+        return false
+    }
+}
