@@ -22,6 +22,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     @Published var sessionState: SessionState = .idle
     @Published var shortcutsAvailable = true
     @Published var hotKeyFailures: [CaptureAction: String] = [:]
+    @Published var shortcutEditError: String?
     let settings: AppSettingsStore
     private let captureService: CaptureService
     private let keys = HotKeyRegistry()
@@ -193,6 +194,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     }
 
     func rebindHotKey(_ action: CaptureAction, to combo: HotKeyCombo?) {
+        shortcutEditError = nil
         do {
             if let combo {
                 try keys.rebind(action: action, to: combo)
@@ -214,11 +216,9 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     }
 
     private func showShortcutError(action: CaptureAction, error: Error) {
-        let alert = NSAlert()
-        alert.messageText = "无法设置「\(action.title)」的快捷键"
-        alert.informativeText = error.localizedDescription
-        alert.addButton(withTitle: "知道了")
-        alert.runModal()
+        // A routine validation failure must not start a modal event loop:
+        // users need to be able to screenshot this error with the old hot key.
+        shortcutEditError = "无法设置「\(action.title)」：\(error.localizedDescription) 原快捷键保持可用。"
     }
 
     func setRecording(_ recording: Bool) {
@@ -231,6 +231,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     }
 
     func restoreDefaultGlobalShortcuts() {
+        shortcutEditError = nil
         settings.settings.globalShortcuts = AppSettings.defaultGlobalShortcuts
         applyHotKeys()
     }

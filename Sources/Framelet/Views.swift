@@ -224,6 +224,9 @@ struct SettingsView: View {
     private var shortcutTab: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack { Text("全局快捷键").font(.headline); Spacer(); Button("全部恢复默认") { controller.restoreDefaultGlobalShortcuts() }.controlSize(.small) }
+            if let message = controller.shortcutEditError {
+                Text(message).font(.caption).foregroundStyle(.orange).accessibilityLabel(message)
+            }
             if !controller.hotKeyFailures.isEmpty {
                 Text("以下快捷键未注册成功：\(controller.hotKeyFailures.map { "\($0.key.title)（\($0.value)）" }.joined(separator: "、"))")
                     .font(.caption).foregroundStyle(.orange)

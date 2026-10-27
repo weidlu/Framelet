@@ -30,6 +30,7 @@ import FrameletCore
             ("设置默认值与类型安全",settingsDefaults),
             ("设置往返与坏值修复",settingsRoundTripAndRepair),
             ("全局快捷键合法性",globalShortcutValidation),
+            ("Option+A 与零号 A 键持久化",optionAHotKey),
             ("选区到像素坐标映射",cropGeometry),
             ("八点调整手柄几何",eightHandles),
             ("裁剪渲染保持标注锚点",croppedRenderKeepsAnchor),

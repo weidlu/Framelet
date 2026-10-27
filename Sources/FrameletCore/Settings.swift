@@ -22,10 +22,13 @@ public struct HotKeyCombo: Codable, Equatable, Hashable {
     public var hasOption: Bool { modifiers & HotKeyModifier.option.rawValue != 0 }
     public var hasShift: Bool { modifiers & HotKeyModifier.shift.rawValue != 0 }
     public var hasRequiredModifier: Bool { hasCommand || hasControl || hasOption }
+    /// macOS virtual key code zero is the A key, not an empty shortcut.
+    /// Absence is represented by Optional.none throughout the settings model.
+    public var isRecordable: Bool { keyCode < 128 && !(54...63).contains(keyCode) }
     /// Global shortcut rule: at least one of Command/Control/Option, never a
     /// bare character or Shift-only combination.
-    public var isValidGlobal: Bool { keyCode != 0 && hasRequiredModifier }
-    public var isBareKey: Bool { keyCode != 0 && !hasCommand && !hasControl && !hasOption }
+    public var isValidGlobal: Bool { isRecordable && hasRequiredModifier }
+    public var isBareKey: Bool { isRecordable && !hasCommand && !hasControl && !hasOption }
 }
 
 /// Global capture actions, keyed by a stable identifier.

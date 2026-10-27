@@ -93,7 +93,7 @@ final class ShortcutRecorderView: NSView {
             finish(nil, commit: true)
             return
         }
-        if Self.isModifierKey(code) { return } // ignore bare modifier presses
+        if !HotKeyCombo(keyCode: UInt32(code)).isRecordable { return }
         finish(HotKeyCombo(keyCode: UInt32(code), modifiers: modifiers), commit: true)
     }
 
@@ -103,10 +103,6 @@ final class ShortcutRecorderView: NSView {
         window?.makeFirstResponder(nil)
         if commit { onCommit?(value) }
         needsDisplay = true
-    }
-
-    private static func isModifierKey(_ code: UInt16) -> Bool {
-        [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 79, 80, 81, 82].contains(code)
     }
 
     override func draw(_ dirtyRect: NSRect) {

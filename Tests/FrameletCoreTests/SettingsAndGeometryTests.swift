@@ -38,13 +38,24 @@ extension ImagingChecks {
     }
 
     static func globalShortcutValidation() throws {
-        try expect(!HotKeyCombo(keyCode: 0).isValidGlobal, "zero key invalid")
+        try expect(!HotKeyCombo(keyCode: 0).isValidGlobal, "bare A is invalid as a global shortcut")
         try expect(!HotKeyCombo(keyCode: 0x20).isValidGlobal, "bare key invalid global")
         try expect(!HotKeyCombo(keyCode: 0x20, modifiers: HotKeyModifier.shift.rawValue).isValidGlobal, "shift-only invalid global")
         try expect(HotKeyCombo(keyCode: 0x20, modifiers: HotKeyModifier.command.rawValue).isValidGlobal, "cmd key valid")
         try expect(HotKeyCombo(keyCode: 0x20, modifiers: HotKeyModifier.control.rawValue | HotKeyModifier.option.rawValue).isValidGlobal, "ctrl+opt valid")
         try expect(HotKeyCombo(keyCode: 0x09).isBareKey, "bare V valid tool key")
         try expect(!HotKeyCombo(keyCode: 0x09, modifiers: HotKeyModifier.command.rawValue).isBareKey, "cmd V not a bare tool key")
+    }
+
+    static func optionAHotKey() throws {
+        let optionA = HotKeyCombo(keyCode: 0, modifiers: HotKeyModifier.option.rawValue)
+        try expect(optionA.hasOption && optionA.isValidGlobal, "Option+A must be valid: macOS A has virtual key code zero")
+        try expect(HotKeyCombo(keyCode: 0).isBareKey, "A is a valid bare annotation key")
+        try expect(!HotKeyCombo(keyCode: 999, modifiers: HotKeyModifier.option.rawValue).isValidGlobal, "unknown key codes are invalid")
+        var settings = AppSettings.defaults
+        settings.globalShortcuts[.region] = optionA
+        let restored = try unwrap(AppSettings.from(data: try unwrap(settings.encode())))
+        try expect(restored.globalShortcuts[.region] == optionA, "settings repair must not drop Option+A")
     }
 
     static func cropGeometry() throws {

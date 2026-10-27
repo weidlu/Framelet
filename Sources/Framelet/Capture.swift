@@ -510,7 +510,7 @@ private final class RegionView: NSView {
             drawLabel("拖动选择区域 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 130), y: bounds.midY + 40))
         }
         if document == nil, hoveredWindow != nil {
-            drawLabel("单击选窗口 · 拖动框选 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 140), y: 24))
+            drawLabel("单击或回车选窗口 · 拖动框选 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 170), y: 24))
         }
     }
 
@@ -924,6 +924,14 @@ private final class RegionView: NSView {
         OverlayDiag.log("RegionView.handleKey keyCode=\(event.keyCode) eventWindow=\(event.window?.title ?? "nil") overlay=\(event.window === window) document=\(document == nil ? "nil" : "set")")
         if event.keyCode == 53 { // Esc
             handleCancelRequest()
+            return true
+        }
+        // The highlighted window is still only a preview. Enter confirms it
+        // exactly like one click; it must not export or remain a dead key.
+        if document == nil, let hoveredWindow,
+           event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+           event.keyCode == 36 || event.keyCode == 76 {
+            select(hoveredWindow.frame, name: hoveredWindow.name)
             return true
         }
         guard let document else { return false }
