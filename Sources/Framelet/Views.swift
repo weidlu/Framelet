@@ -87,7 +87,7 @@ struct EditorView: View {
             HStack(spacing: 5) {
                 ForEach(MarkTool.allCases) { tool in
                     Button { document.tool = tool } label: {
-                        VStack(spacing: 5) { Image(systemName: tool.symbol).font(.system(size: 17)); Text(tool.title).font(.system(size: 10)) }
+                        VStack(spacing: 5) { MarkToolIcon(tool: tool, color: document.tool == tool ? Palette.blue : Palette.ink); Text(tool.title).font(.system(size: 10)) }
                             .frame(width: 48, height: 49).background(document.tool == tool ? Palette.blue.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 7))
                             .foregroundStyle(document.tool == tool ? Palette.blue : Palette.ink)
                     }.buttonStyle(.plain).help(tool.title).accessibilityLabel(tool.title)

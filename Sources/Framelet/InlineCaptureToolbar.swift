@@ -40,13 +40,11 @@ struct InlineCaptureToolbar: View {
     private func mainRow(compact: Bool, minimal: Bool = false) -> some View {
         HStack(spacing: 4) {
             if !minimal {
-                toolButton("移动选区", symbol: "cursorarrow", selected: document.tool == nil, key: key(for: .move)) { chooseTool(nil) }
+                toolButton("移动选区", caption: "移动", symbol: "cursorarrow", selected: document.tool == nil, key: key(for: .move)) { chooseTool(nil) }
                 separator
             }
             ForEach(minimal ? [] : compact ? [.rectangle, .arrow, .text] : MarkTool.allCases) { tool in
-                toolButton(tool.title, symbol: tool.symbol, selected: document.tool == tool, key: key(for: ToolKeyAction(markTool: tool))) {
-                    chooseTool(document.tool == tool ? nil : tool)
-                }
+                markButton(tool)
             }
             separator
             iconButton("撤销", symbol: "arrow.uturn.backward", key: "⌘Z") { action(.undo) }.disabled(!document.canUndo)
@@ -58,7 +56,7 @@ struct InlineCaptureToolbar: View {
                         }
                         ForEach(MarkTool.allCases.filter { minimal || ![.rectangle, .arrow, .text].contains($0) }) { tool in
                             Button { chooseTool(document.tool == tool ? nil : tool) } label: {
-                                Label(tool.title, systemImage: tool.symbol)
+                                Label { Text(tool.title) } icon: { MarkToolIcon(tool: tool) }
                             }
                         }
                     }
@@ -112,7 +110,7 @@ struct InlineCaptureToolbar: View {
                 .font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted).frame(width: 18)
             if showDetails {
                 Spacer(minLength: 12)
-                Text(document.message ?? "\(document.pixelWidth) × \(document.pixelHeight) px")
+                Text(document.message ?? document.tool?.toolbarHint ?? "\(document.pixelWidth) × \(document.pixelHeight) px")
                     .font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted).lineLimit(1)
             }
         }
@@ -148,12 +146,36 @@ struct InlineCaptureToolbar: View {
                 set: { document.fontSize = $0; settings.settings.fontSize = Double($0) })
     }
 
-    private func toolButton(_ title: String, symbol: String, selected: Bool = false, key: String?, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 15, weight: .regular))
-            .frame(minWidth: 30, minHeight: 32)
+    private func markButton(_ tool: MarkTool) -> some View {
+        let selected = document.tool == tool
+        let shortcut = key(for: ToolKeyAction(markTool: tool))
+        return Button { chooseTool(selected ? nil : tool) } label: {
+            VStack(spacing: 2) {
+                MarkToolIcon(tool: tool, color: selected ? Palette.blue : Palette.ink)
+                Text(tool.title).font(.system(size: 10, weight: selected ? .medium : .regular))
+            }
+            .frame(width: tool == .pixelate ? 44 : 36, height: 36)
             .foregroundStyle(selected ? Palette.blue : Palette.ink)
-            .background(selected ? Palette.blue.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .background(selected ? Palette.selection : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietButtonStyle())
+        .help("\(tool.title)\(shortcut.map { " · " + $0 } ?? "")\n\(tool.toolbarHint)")
+        .accessibilityLabel(tool.title)
+        .accessibilityHint(tool.toolbarHint)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    private func toolButton(_ title: String, caption: String, symbol: String, selected: Bool = false, key: String?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Image(systemName: symbol).font(.system(size: 15, weight: .regular)).frame(height: 16)
+                Text(caption).font(.system(size: 10, weight: selected ? .medium : .regular))
+            }
+            .frame(width: 36, height: 36)
+            .foregroundStyle(selected ? Palette.blue : Palette.ink)
+            .background(selected ? Palette.selection : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle()).help(key.map { "\(title) · \($0)" } ?? title).accessibilityLabel(title)
             .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
