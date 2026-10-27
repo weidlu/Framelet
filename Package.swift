@@ -8,7 +8,7 @@ let package = Package(
     targets: [
         .target(name: "FrameletCore"),
         .executableTarget(name: "Framelet", dependencies: ["FrameletCore"]),
-        .executableTarget(name: "FrameletChecks", dependencies: ["FrameletCore"], path: "Tests/FrameletCoreTests")
+        .executableTarget(name: "FrameletChecks", dependencies: ["FrameletCore"], path: "Tests/FrameletCoreTests", resources: [.copy("Fixtures")])
     ],
     swiftLanguageModes: [.v5]
 )

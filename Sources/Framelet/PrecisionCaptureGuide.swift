@@ -8,6 +8,7 @@ final class PrecisionCaptureGuide: NSView {
     let image: CGImage
     var point: CGPoint? { didSet { needsDisplay = true } }
     var candidate: CGRect? { didSet { needsDisplay = true } }
+    var message: String? { didSet { needsDisplay = true } }
     var dragging = false { didSet { needsDisplay = true } }
     init(image: CGImage) { self.image = image; super.init(frame: .zero) }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
@@ -15,7 +16,7 @@ final class PrecisionCaptureGuide: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let point, bounds.contains(point), let ctx = NSGraphicsContext.current?.cgContext else { return }
+        guard let point, bounds.insetBy(dx: -0.01, dy: -0.01).contains(point), let ctx = NSGraphicsContext.current?.cgContext else { return }
         ctx.saveGState()
         defer { ctx.restoreGState() }
         ctx.setShouldAntialias(false)
@@ -34,7 +35,7 @@ final class PrecisionCaptureGuide: NSView {
         ctx.addPath(path); ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.9).cgColor)
         ctx.setLineWidth(0.5); ctx.strokePath()
 
-        let panel = PixelInspection.panelFrame(at: point, bounds: bounds, size: CGSize(width: 144, height: 176))
+        let panel = PixelInspection.panelFrame(at: point, bounds: bounds, size: CGSize(width: 184, height: 224))
         ctx.setShouldAntialias(true)
         NSColor(calibratedWhite: 0.09, alpha: 0.97).setFill()
         NSBezierPath(roundedRect: panel, xRadius: 8, yRadius: 8).fill()
@@ -42,7 +43,7 @@ final class PrecisionCaptureGuide: NSView {
         let sample = PixelInspection.sampleRect(pixel: pixel)
         let clipped = sample.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
         let cell: CGFloat = 8
-        let grid = CGRect(x: panel.minX + 12, y: panel.maxY - 132, width: 120, height: 120)
+        let grid = CGRect(x: panel.midX - 60, y: panel.maxY - 132, width: 120, height: 120)
         NSColor(calibratedWhite: 0.25, alpha: 1).setFill(); grid.fill()
         if let crop = image.cropping(to: clipped) {
             let destination = CGRect(x: grid.minX + (clipped.minX - sample.minX) * cell,
@@ -65,7 +66,12 @@ final class PrecisionCaptureGuide: NSView {
         ctx.setStrokeColor(NSColor.systemYellow.cgColor); ctx.setLineWidth(1); ctx.stroke(center)
         ctx.setShouldAntialias(true)
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white]
-        ("X \(Int(pixel.x))  Y \(Int(pixel.y))" as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 23), withAttributes: attrs)
+        ("X \(Int(pixel.x))  Y \(Int(pixel.y))" as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 71), withAttributes: attrs)
+        if let color = SampledColor.read(image, pixel: pixel) {
+            (color.hex + "  " + "\(color.red),\(color.green),\(color.blue)" as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 54), withAttributes: attrs)
+        }
+        ((message ?? "G 复制 HEX · R 复制 RGB") as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 39), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.systemYellow])
+        ("方向键微调 · 空格设起点" as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 23), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.white])
         let hint = dragging ? "松开选定 · Esc 取消" : "单击选窗 · 拖动框选"
         (hint as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 7), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor(white: 0.75, alpha: 1)])
     }

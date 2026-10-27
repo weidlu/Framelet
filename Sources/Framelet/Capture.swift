@@ -6,6 +6,7 @@ import Combine
 
 enum CaptureOutcome {
     case cancelled
+    case scrolling(LastRegion)
     case finished(lastRegion: LastRegion?)
     case pinned(CGImage, name: String, lastRegion: LastRegion?)
 }
@@ -405,6 +406,8 @@ private final class RegionView: NSView {
     private var hoveredWindow: CaptureWindowCandidate?
     private var pressedWindow: CaptureWindowCandidate?
     private var pressPoint: CGPoint?
+    private var keyboardAim: CGPoint?
+    private var keyboardAnchor: CGPoint?
     private let precisionGuide: PrecisionCaptureGuide
     private var displayedSelection: CGRect? { selection }
 
@@ -462,6 +465,7 @@ private final class RegionView: NSView {
     }
     override func mouseMoved(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        keyboardAim = nil
         refreshWindowHover(at: point)
         updatePointer(at: point)
     }
@@ -489,7 +493,7 @@ private final class RegionView: NSView {
     private func updatePrecisionGuide(at point: CGPoint) {
         precisionGuide.frame = bounds
         precisionGuide.isHidden = document != nil || exited
-        precisionGuide.point = bounds.contains(point) ? alignedPoint(point) : nil
+        precisionGuide.point = bounds.insetBy(dx: -0.01, dy: -0.01).contains(point) ? alignedPoint(point) : nil
         precisionGuide.candidate = hoveredWindow?.frame
         precisionGuide.dragging = start != nil
     }
@@ -564,6 +568,7 @@ private final class RegionView: NSView {
             return
         }
         if document == nil {
+            keyboardAim = nil; keyboardAnchor = nil
             pressPoint = alignedPoint(point)
             pressedWindow = WindowSelection.target(at: point, candidates: windowCandidates)
             hoveredWindow = pressedWindow
@@ -575,7 +580,7 @@ private final class RegionView: NSView {
         let point = alignedPoint(convert(event.locationInWindow, from: nil))
         if document == nil { updatePrecisionGuide(at: point) }
         if let resizing {
-            guard let newSelection = CaptureGeometry.resized(selection: resizing.original, kind: resizing.kind, to: point, bounds: bounds) else { return }
+            guard let newSelection = CaptureGeometry.resized(selection: resizing.original, kind: resizing.kind, to: point, bounds: bounds, minimum: 1 / CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) else { return }
             recordPendingEditIfNeeded()
             applySelection(newSelection)
             return
@@ -648,7 +653,8 @@ private final class RegionView: NSView {
         let origin = alignedPoint(clipped.origin)
         let end = alignedPoint(CGPoint(x: clipped.maxX, y: clipped.maxY))
         let rect = CGRect(x: origin.x, y: origin.y, width: end.x - origin.x, height: end.y - origin.y)
-        guard !rect.isNull, rect.width >= 4, rect.height >= 4 else { resetSelection(); return }
+        let minPoint = 1 / CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)
+        guard !rect.isNull, rect.width >= minPoint, rect.height >= minPoint else { resetSelection(); return }
         onPhase?(.editing)
         hoveredWindow = nil; pressedWindow = nil; pressPoint = nil
         start = rect.origin; current = CGPoint(x: rect.maxX, y: rect.maxY)
@@ -723,7 +729,7 @@ private final class RegionView: NSView {
     private func syncSelectionFromDocument() {
         guard let document else { return }
         let rect = CaptureGeometry.viewRect(document.selectionPixelRect, viewBounds: bounds, imageSize: imageSize)
-        guard rect.width >= 1, rect.height >= 1 else { return }
+        guard rect.width > 0, rect.height > 0 else { return }
         if start != rect.origin || current != CGPoint(x: rect.maxX, y: rect.maxY) {
             start = rect.origin
             current = CGPoint(x: rect.maxX, y: rect.maxY)
@@ -738,6 +744,7 @@ private final class RegionView: NSView {
         canvas = nil; toolbar = nil; document = nil; documentObservation = nil
         start = nil; current = nil; moving = nil; resizing = nil; pendingEditDocument = nil
         pressPoint = nil; pressedWindow = nil; hoveredWindow = nil
+        keyboardAim = nil; keyboardAnchor = nil
         refreshWindowHover()
         refreshSelectionUI()
     }
@@ -755,7 +762,7 @@ private final class RegionView: NSView {
         guard let toolbar, let selection else { return }
         let showProps = document?.tool != nil
         // 44 (main row) + 1 (divider) + 40 (property row) when properties show.
-        let preferred = CGSize(width: 664, height: showProps ? 86 : 45)
+        let preferred = CGSize(width: 664, height: showProps ? 86 : (document?.message != nil ? 77 : 45))
         let frame = CaptureLayout.toolbarFrame(selection: selection, screen: bounds, preferredSize: preferred)
         toolbar.frame = frame
     }
@@ -774,6 +781,14 @@ private final class RegionView: NSView {
             return
         }
         switch action {
+        case .scroll:
+            guard document.marks.isEmpty else {
+                document.message = "长截图请在标注前开始，或撤销现有标注。"; return
+            }
+            guard document.pixelWidth >= 32, document.pixelHeight >= 100, let region = makeLastRegion() else {
+                document.message = "长截图区域至少为 32 × 100 像素。"; return
+            }
+            document.invalidate(); exit(.scrolling(region))
         case .cancel: cancelCapture()
         case .reselect: resetSelection()
         case .save: performSave()
@@ -945,6 +960,56 @@ private final class RegionView: NSView {
         OverlayDiag.log("RegionView.handleKey keyCode=\(event.keyCode) eventWindow=\(event.window?.title ?? "nil") overlay=\(event.window === window) document=\(document == nil ? "nil" : "set")")
         if event.keyCode == 53 { // Esc
             handleCancelRequest()
+            return true
+        }
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        if document == nil, modifiers.isEmpty,
+           let key = event.charactersIgnoringModifiers?.lowercased(), ["g", "r"].contains(key),
+           let point = keyboardAim ?? precisionGuide.point,
+           let color = SampledColor.read(image, pixel: PixelInspection.pixel(at: point, bounds: bounds, imageSize: imageSize)) {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(key == "g" ? color.hex : color.rgb, forType: .string)
+            precisionGuide.message = "已复制 " + (key == "g" ? color.hex : "RGB")
+            return true
+        }
+        // In text editors the session monitor passes events through unchanged.
+        // During aiming, arrows move a virtual endpoint without warping the OS
+        // pointer. Space anchors it; Enter confirms a manually sized selection.
+        let delta: (Int, Int)? = [123: (-1, 0), 124: (1, 0), 125: (0, -1), 126: (0, 1)][Int(event.keyCode)]
+        if let delta, modifiers.intersection([.command, .control]).isEmpty {
+            let step = modifiers.contains(.shift) ? 10 : 1
+            if let document, document.tool == nil {
+                let next = PrecisionEditing.nudge(document.selectionPixelRect, dx: delta.0 * step, dy: delta.1 * step,
+                                                   resize: modifiers.contains(.option), imageSize: imageSize)
+                if next != document.selectionPixelRect {
+                    document.beginEdit()
+                    document.selectionPixelRect = next
+                    syncSelectionFromDocument(); repositionToolbar()
+                }
+                return true
+            }
+            if document == nil, !modifiers.contains(.option) {
+                let point = keyboardAim ?? precisionGuide.point ?? CGPoint(x: bounds.midX, y: bounds.midY)
+                let next = alignedPoint(CGPoint(x: point.x + CGFloat(delta.0 * step) * bounds.width / imageSize.width,
+                                               y: point.y + CGFloat(delta.1 * step) * bounds.height / imageSize.height))
+                keyboardAim = next
+                if keyboardAnchor != nil { current = next; refreshSelectionUI() }
+                else { refreshWindowHover(at: next) }
+                updatePrecisionGuide(at: next)
+                return true
+            }
+        }
+        if document == nil, modifiers.isEmpty, event.keyCode == 49 {
+            let point = keyboardAim ?? precisionGuide.point ?? CGPoint(x: bounds.midX, y: bounds.midY)
+            keyboardAnchor = point; keyboardAim = point
+            start = point; current = point; hoveredWindow = nil
+            precisionGuide.message = "方向键调终点 · Enter 选定"
+            refreshSelectionUI(); updatePrecisionGuide(at: point)
+            return true
+        }
+        if document == nil, keyboardAnchor != nil, modifiers.isEmpty, event.keyCode == 36 || event.keyCode == 76 {
+            if let selection { select(selection, name: "区域截图") }
+            keyboardAim = nil; keyboardAnchor = nil
             return true
         }
         // The highlighted window is still only a preview. Enter confirms it

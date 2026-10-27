@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import FrameletCore
 
-enum InlineAction: Equatable { case cancel, reselect, save, pin, ocr, undo, redo, complete }
+enum InlineAction: Equatable { case cancel, reselect, save, pin, ocr, undo, redo, complete, scroll }
 
 struct InlineCaptureToolbar: View {
     @ObservedObject var document: CaptureDocument
@@ -19,6 +19,9 @@ struct InlineCaptureToolbar: View {
                 mainRow(compact: true, minimal: true)
             }
             .padding(.horizontal, 8).frame(height: 44)
+            if let message = document.message, document.tool == nil {
+                Text(message).font(.system(size: 11)).foregroundStyle(Palette.ink).lineLimit(2).padding(.horizontal, 10).frame(height: 32)
+            }
             if document.tool != nil {
                 Divider().padding(.horizontal, 10)
                 ViewThatFits(in: .horizontal) {
@@ -64,6 +67,7 @@ struct InlineCaptureToolbar: View {
                 Button { action(.reselect) } label: { Label("重新选择", systemImage: "viewfinder") }
                 Divider()
                 Button { action(.ocr) } label: { Label(document.recognizing ? "识别中…" : "提取文字", systemImage: "text.viewfinder") }.disabled(document.recognizing)
+                Button { action(.scroll) } label: { Label("长截图 · 向下滚动拼接", systemImage: "arrow.down.to.line") }.disabled(!document.marks.isEmpty)
                 Button { action(.pin) } label: { Label("贴图", systemImage: "pin") }
                 if compact { Button { action(.save) } label: { Label("保存…", systemImage: "square.and.arrow.down") } }
             } label: {
@@ -121,7 +125,7 @@ struct InlineCaptureToolbar: View {
         if document.tool == .redact { return "拖动覆盖敏感内容" }
         if document.tool == .pixelate { return "敏感文字建议使用遮挡" }
         if let tool = document.tool { return "在选区内拖动绘制\(tool.title) · Esc 取消笔画" }
-        return "拖动手柄调整 · 双击完成 · Cmd+C 复制"
+        return "方向键移动 1px · Shift 10px · Option 调整大小 · Cmd+C 复制"
     }
 
     private func key(for action: ToolKeyAction) -> String? {

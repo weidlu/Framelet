@@ -13,6 +13,12 @@ import FrameletCore
     }
     static func main() throws {
         let checks: [(String,() throws -> Void)] = [
+            ("键盘逐像素移动和最小选区",keyboardPixelEditing),
+            ("sRGB 取色和坐标方向",pixelColorSampling),
+            ("长截图连续拼接与固定页头页脚",scrollStitchContinuity),
+            ("真实网页重复段落不误拼",scrollRejectsRepeatedParagraphs),
+            ("长图细条拼接及 PNG/TIFF 逐像素保真",scrollPixelFidelity),
+            ("长截图拒绝无重叠和空白误拼",scrollRejectsAmbiguity),
             ("截图阶段与鼠标光标一致",capturePointerPhases),
             ("标注拖动限制在已确认选区",captureDrawingBoundary),
             ("窗口感应优先选择最前方窗口",windowHoverOrdering),

@@ -26,6 +26,8 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     let settings: AppSettingsStore
     private let captureService: CaptureService
     private let keys = HotKeyRegistry()
+    private let countdown = CaptureCountdown()
+    private var scrolling: ScrollingCapture?
     private var home: NSWindow?
     private var settingsWindow: NSWindow?
     private var picker: NSWindow?
@@ -92,6 +94,8 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Never trap the app in a stuck capture session: tear it down and quit.
+        countdown.cancel()
+        scrolling?.cancel()
         if sessionState != .idle { captureService.cancelActiveSession() }
         if editors.contains(where: { $0.document.hasUnsavedMarks }) {
             let alert = NSAlert(); alert.messageText = "退出拾影？"; alert.informativeText = "尚未保存的标注将丢失。"
@@ -124,6 +128,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         captureSubmenu.addItem(withTitle: "全屏截图", action: #selector(fullAction), keyEquivalent: "")
         captureSubmenu.addItem(withTitle: "窗口截图…", action: #selector(windowAction), keyEquivalent: "")
         captureSubmenu.addItem(withTitle: "上次区域截图", action: #selector(lastRegionAction), keyEquivalent: "")
+        addDelayedCaptureMenu(to: captureSubmenu)
         captureItem.submenu = captureSubmenu; main.addItem(captureItem)
 
         let file = NSMenuItem(); file.title = "文件"; let fileMenu = NSMenu(title: "文件")
@@ -173,12 +178,31 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
             let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
             item.target = self
         }
+        addDelayedCaptureMenu(to: menu)
         menu.addItem(.separator())
         menu.addItem(withTitle: "设置…", action: #selector(showSettingsWindow), keyEquivalent: ",").target = self
         menu.addItem(withTitle: "打开拾影", action: #selector(showHome), keyEquivalent: "").target = self
         let quit = menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         return menu
+    }
+
+    private func addDelayedCaptureMenu(to menu: NSMenu) {
+        let parent = NSMenuItem(title: "延时截图", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        for seconds in [3, 5, 10] {
+            let item = submenu.addItem(withTitle: "\(seconds) 秒后截图", action: #selector(delayedCapture(_:)), keyEquivalent: "")
+            item.tag = seconds; item.target = self
+        }
+        parent.submenu = submenu; menu.addItem(parent)
+    }
+    @objc private func delayedCapture(_ item: NSMenuItem) {
+        guard sessionState == .idle else { return }
+        startCapture {
+            guard await self.countdown.wait(seconds: item.tag) else { return .cancelled }
+            try await Task.sleep(nanoseconds: 150_000_000)
+            return try await self.captureService.region()
+        }
     }
 
     private func menuTitle(_ title: String, _ action: CaptureAction) -> String {
@@ -296,7 +320,15 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
                 DebugLog.write("startCapture: sleeping")
                 try await Task.sleep(nanoseconds: 200_000_000)
                 sessionState = .selecting
-                let outcome = try await operation()
+                var outcome = try await operation()
+                if case .scrolling(let region) = outcome {
+                    // The frozen overlay is already gone. Scrolling reaches the
+                    // original app; only our non-activating controls remain.
+                    let controller = ScrollingCapture(settings: self.settings, region: region)
+                    self.scrolling = controller
+                    outcome = await controller.run()
+                    self.scrolling = nil
+                }
                 DebugLog.write("startCapture: outcome \(outcome)")
                 handleCapture(outcome, restoring: visible, previousFrontmost: previousFrontmost)
             } catch {
@@ -309,7 +341,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
 
     private func handleCapture(_ outcome: CaptureOutcome, restoring visible: [NSWindow], previousFrontmost: NSRunningApplication?) {
         switch outcome {
-        case .cancelled:
+        case .scrolling, .cancelled:
             restoreAfterSession(visible: visible, previousFrontmost: previousFrontmost)
         case .finished(let lastRegion):
             if let lastRegion { settings.settings.lastRegion = lastRegion }
@@ -375,6 +407,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     @objc func showSettings() { showSettings(tab: 0) }
 
     func showSettings(tab: Int) {
+        guard sessionState == .idle else { return }
         permission = CGPreflightScreenCaptureAccess()
         let window = settingsWindow ?? makeWindow(title: "拾影设置", size: CGSize(width: 800, height: 620))
         window.minSize = CGSize(width: 760, height: 560)
