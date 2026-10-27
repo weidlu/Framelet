@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>版本日志与构建说明 — 拾影 · Framelet</title>
+  <meta name="description" content="拾影 / Framelet 的版本发布记录、更新日志、系统要求与公证分发说明。">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="assets/img/app-icon-128.png">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+
+  <!-- 顶部导航栏 -->
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a href="index.html" class="brand-link" aria-label="拾影 Framelet 官网首页">
+        <img src="assets/img/app-icon-128.png" alt="拾影 AppIcon" class="brand-icon" width="32" height="32">
+        <span>拾影 <span style="font-weight: 400; opacity: 0.85;">Framelet</span></span>
+      </a>
+
+      <nav aria-label="主导航">
+        <ul class="nav-links">
+          <li><a href="index.html#viewfinder-demo" class="nav-link">交互演示</a></li>
+          <li><a href="index.html#features" class="nav-link">功能特性</a></li>
+          <li><a href="releases.html" class="nav-link active" style="color: var(--accent-iris);">版本说明</a></li>
+          <li><a href="privacy.html" class="nav-link">隐私政策</a></li>
+        </ul>
+      </nav>
+
+      <a href="index.html" class="nav-cta">
+        <span>返回首页</span>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-container">
+      <header class="page-header">
+        <h1 class="page-title">版本发布记录与分发说明</h1>
+        <div class="page-meta">
+          <span>当前分支：0.3.1 预览版</span>
+          <span>·</span>
+          <span>分发途径：官网独立 DMG 下载</span>
+          <span>·</span>
+          <span>系统要求：macOS 14.0+</span>
+        </div>
+      </header>
+
+      <article class="article-content">
+
+        <!-- 下载状态提示面板 -->
+        <div class="boundary-box" style="margin-bottom: 2.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 1.1rem; color: var(--text-main);">
+              <span class="status-dot"></span>
+              <span>Framelet 0.3.1 预览版构建状态</span>
+            </div>
+            <span class="brand-badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.3);">已通过 Apple 公证</span>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            包含 Apple Silicon 与 Intel 的 Universal 2 原生二进制已构建并完成 Developer ID 签名；已通过 Apple 公证，安装包已附加公证票据。
+          </p>
+          <div style="font-size: 0.825rem; font-family: var(--font-mono); color: var(--text-muted); background: var(--bg-tertiary); padding: 0.6rem 0.85rem; border-radius: 6px;">
+            目标架构: Universal 2 (arm64 + x86_64) | 最低支持: macOS Sonoma 14.0+
+          </div>
+        </div>
+
+        <h2>v0.3.1 预览版 (2026-10-28)</h2>
+        <ul>
+          <li>选区左上角新增圆角滑块，支持直角到常用圆角，并记住上次设置。</li>
+          <li>截图和长截图导出支持圆角；PNG 和剪贴板图像保留透明角。JPEG 不支持透明角，会填充白色。</li>
+          <li>选区靠近屏幕边缘时，圆角滑块会避让标注工具栏。</li>
+          <li>项目源代码以 MIT 许可证开源：<a href="https://github.com/weidlu/Framelet">查看 GitHub 仓库</a>。</li>
+        </ul>
+
+        <!-- 0.3.0 详细更新日志 -->
+        <h2>v0.3.0 预览版 (2026-10-27)</h2>
+        <p>
+          本版本聚焦于「像素级精确选区」、「高清连续长截图拼接」与「实用取色微调」的核心体验提升。
+        </p>
+
+        <h3>新增与优化特性</h3>
+        <ul>
+          <li>
+            <strong>长十字线与实时像素放大镜</strong>：
+            在屏幕瞄准时提供横贯屏幕的长十字参考线，并浮动呈现放大镜与 sRGB 色值；按下 <kbd>G</kbd> 快速复制 HEX 颜色代码，按下 <kbd>R</kbd> 快速复制 RGB 代码，期间保持截取会话不中断。
+          </li>
+          <li>
+            <strong>1 像素级键盘精准微调</strong>：
+            在选区准备阶段，支持通过方向键以 1 原始像素步进调整位置或边缘，按住 <kbd>Shift</kbd> 为 10 像素步进；支持按 <kbd>空格</kbd> 设定起点，方向键调整终点，<kbd>Enter</kbd> 立即选定。
+          </li>
+          <li>
+            <strong>连续滚动长截图高清拼接与侧边预览</strong>：
+            连续向下滚动时自动拼接，并在侧边显示实时预览。保留原始屏幕像素，优化 Retina 屏幕预览清晰度，支持识别部分固定页头与页脚。
+          </li>
+          <li>
+            <strong>3 / 5 / 10 秒延时截图</strong>：
+            在菜单栏提供 3秒、5秒、10秒三种倒计时延时截图入口，支持在倒计时期间随时按 Esc 取消，倒计时面板完全淡出后方触发捕获，方便截取悬浮菜单和临时浮层。
+          </li>
+          <li>
+            <strong>本机 Apple Vision 离线中英文 OCR</strong>：
+            纯本地调用系统原生视觉识别模型，识别选区内文字并支持快速编辑与复制，敏感文字信息零外发。
+          </li>
+          <li>
+            <strong>TIFF 与 PNG 剪贴板双重支持</strong>：
+            优化系统剪贴板输出，支持无损色彩的 TIFF 与标准 PNG，方便粘贴到其他应用；最终显示效果也取决于目标应用。
+          </li>
+          <li>
+            <strong>基础贴图与系统开机自启</strong>：
+            支持将截取或标注的图片一键固定置顶于屏幕上（Pin on screen）；设置中支持登录开机自启动及自定义全局快捷键。
+          </li>
+        </ul>
+
+        <h3>已知局限与边界说明 (Limitations)</h3>
+        <p>
+          为确保产品诚实透明，我们如实列出当前版本的技术边界：
+        </p>
+        <ul>
+          <li><strong>仅支持纵向滚动长图</strong>：长截图需要页面在滚动中有真实、连续且可验证的物理像素重叠；对于大片纯色空白、纯重复纹理背景、全屏视频播放以及复杂的双向内嵌滚动，算法为防止错误拼接会提示拒绝。</li>
+          <li><strong>固定边缘识别上限</strong>：页面固定页头/页脚识别范围上限为视口高度的 1/5。</li>
+          <li><strong>长图尺寸安全限制</strong>：拼接总高度上限为 30,000 像素或 4000 万总像素，防止极端大图撑爆系统显存。</li>
+          <li><strong>单层重新编码合成</strong>：导出的截图文件为压平的单层位图，不支持再次打开工程文件对画过的箭头或文字进行二次矢量编辑。</li>
+          <li><strong>暂不包含</strong>：录屏、翻译、数字序号标注、全自动机械滚动。</li>
+        </ul>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 2.5rem 0;">
+
+        <!-- 历史版本 -->
+        <h2>历史版本</h2>
+        <h3>v0.2.0 预览版 (2026-10-27 早前)</h3>
+        <ul>
+          <li>实现基础区域截图、窗口截图（列出可见应用窗口）、全屏截图。</li>
+          <li>提供截取后原地呼出的原位悬浮工具栏，包含箭头、方框、圆圈、自由画笔、文字、马赛克、纯色遮挡。</li>
+          <li>集成 Apple Vision 本机文字识别基础流程。</li>
+          <li>提供 PNG/JPEG 保存与剪贴板复制基础逻辑。</li>
+        </ul>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 2.5rem 0;">
+
+        <!-- 完整性校验指引 -->
+        <h2>安装包完整性校验指引</h2>
+        <p>
+          下载后可在终端执行以下命令，并与下方校验值核对：
+        </p>
+        <p><a class="btn-primary" href="/downloads/Framelet-0.3.1.dmg">下载 Framelet 0.3.1 · 2.2 MB</a></p>
+<pre><code>shasum -a 256 Framelet-0.3.1.dmg</code></pre>
+<p>SHA-256：</p><pre style="overflow-wrap:anywhere;white-space:pre-wrap"><code>9853d97e5fa6d71f003a63c1c5b93fa6e1b5094edfaa728a3984ae344d1242b0</code></pre>
+        <p>
+          如需校验 Apple Developer ID 签名与公证票据状态，可执行：
+        </p>
+        <pre><code>spctl --assess --type execute --verbose=2 /Applications/Framelet.app</code></pre>
+
+      </article>
+    </div>
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="assets/img/app-icon-128.png" alt="拾影 Logo" width="24" height="24" style="border-radius: 6px;">
+          <span>拾影 · Framelet</span>
+        </div>
+
+        <ul class="footer-links">
+          <li><a href="index.html">首页</a></li>
+          <li><a href="releases.html" style="color: var(--accent-iris);">版本说明</a></li>
+          <li><a href="privacy.html">隐私政策</a></li>
+          <li><a href="https://yinbingshi.com" target="_blank" rel="noopener noreferrer">饮冰工作室</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          © 2026 拾影 / Framelet. 独立开发并遵循本地优先原则。
+        </div>
+        <div style="color: var(--text-muted); font-size: 0.75rem;">
+          发布目标：<code>framelet.slnt.dev</code> · 本站托管于 Cloudflare 边缘网络
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

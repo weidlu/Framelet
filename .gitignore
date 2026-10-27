@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+dist/
+.DS_Store
+*.dmg
+*.zip
+*.xcuserstate
+
+# Local agent/scratch material
+.pi/
+work/
