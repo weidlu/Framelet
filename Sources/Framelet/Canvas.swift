@@ -145,6 +145,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 final class CaptureCanvasView: NSView, NSTextFieldDelegate {
     let document: CaptureDocument
     var drawingEnabled = true
+    var onCancel: (() -> Void)?
     private var pending: Mark?
     private var textField: NSTextField?
     private var textPosition: CGPoint?
@@ -153,13 +154,17 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
     init(document: CaptureDocument) {
         self.document = document
         super.init(frame: .zero)
+        wantsLayer = true
+        layer?.masksToBounds = true
         observation = document.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { self?.needsDisplay = true }
         }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     override var acceptsFirstResponder: Bool { true }
-    override func resetCursorRects() { addCursorRect(bounds, cursor: drawingEnabled ? .crosshair : .openHand) }
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: drawingEnabled ? (document.tool == .text ? .iBeam : .crosshair) : .openHand)
+    }
     override func hitTest(_ point: NSPoint) -> NSView? { drawingEnabled ? super.hitTest(point) : nil }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -172,8 +177,10 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
 
     private func imagePoint(_ event: NSEvent) -> CGPoint {
         let local = convert(event.locationInWindow, from: nil)
-        return CGPoint(x: (local.x + frame.origin.x) * document.scale,
-                       y: (local.y + frame.origin.y) * document.scale)
+        return CaptureInteraction.clamped(
+            CGPoint(x: (local.x + frame.origin.x) * document.scale,
+                    y: (local.y + frame.origin.y) * document.scale),
+            to: document.selectionPixelRect)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -200,8 +207,9 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { _ = cancelPendingStroke() } else { super.keyDown(with: event) }
+        if event.keyCode == 53 { onCancel?() } else { super.keyDown(with: event) }
     }
+    override func cancelOperation(_ sender: Any?) { onCancel?() }
 
     /// Drops the in-progress stroke (if any) and reports whether one existed.
     @discardableResult
@@ -215,10 +223,12 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
 
     private func beginText(at point: CGPoint, viewPoint: CGPoint) {
         commitText()
-        let width = min(280, max(90, bounds.width-viewPoint.x))
-        let field = NSTextField(frame: CGRect(x: min(viewPoint.x, max(0, bounds.width-width)), y: max(0, viewPoint.y-10), width: width, height: 34))
+        let width = min(280, bounds.width)
+        let height = min(34, bounds.height)
+        let field = NSTextField(frame: CGRect(x: min(max(0, viewPoint.x), max(0, bounds.width-width)),
+                                             y: min(max(0, viewPoint.y-10), max(0, bounds.height-height)), width: width, height: height))
         field.placeholderString = "输入文字，回车确认"
-        field.font = .systemFont(ofSize: max(11, document.fontSize / 2), weight: .semibold)
+        field.font = .systemFont(ofSize: max(11, document.fontSize / document.scale), weight: .semibold)
         field.textColor = document.color
         field.delegate = self
         field.backgroundColor = .white; field.isBezeled = true

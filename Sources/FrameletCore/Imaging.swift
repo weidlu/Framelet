@@ -150,8 +150,8 @@ public enum Imaging {
                                        imageSize: CGSize) throws -> CGImage {
         guard base.width > 0, base.height > 0 else { throw ImagingError.render }
         let pixel = CaptureGeometry.pixelRect(viewRect, viewBounds: viewBounds, imageSize: imageSize)
-            .intersection(CGRect(x: 0, y: 0, width: imageSize.width, height: imageSize.height))
-        guard !pixel.isNull, pixel.width >= 1, pixel.height >= 1 else { throw ImagingError.render }
+        let visible = pixel.intersection(CGRect(x: 0, y: 0, width: imageSize.width, height: imageSize.height))
+        guard !visible.isNull, visible.width >= 1, visible.height >= 1 else { throw ImagingError.render }
         guard let ctx = context(width: base.width, height: base.height) else { throw ImagingError.render }
         ctx.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
         // Marks/pixels use a bottom-left origin; CGContext.draw is already

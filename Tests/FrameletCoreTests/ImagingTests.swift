@@ -13,6 +13,8 @@ import FrameletCore
     }
     static func main() throws {
         let checks: [(String,() throws -> Void)] = [
+            ("截图阶段与鼠标光标一致",capturePointerPhases),
+            ("标注拖动限制在已确认选区",captureDrawingBoundary),
             ("Retina 选区原点与倍率转换",retinaCrop),
             ("选区越界裁剪",clampedCrop),
             ("图像比例与居中",fitting),
@@ -32,10 +34,10 @@ import FrameletCore
             ("完成动作策略矩阵",completionPolicyMatrix),
             ("剪贴板同时写入 PNG 与 TIFF",pasteboardWritesPNGAndTIFF),
             ("JPEG 展平透明背景",jpegFlattensTransparency),
-            ("设置重启后保持",settingsPersistAcrossReload),
+            ("设置编码往返保持选择",settingsEncodeDecodeRoundTrip),
             ("未知或损坏设置不崩溃",unknownEnumFallsBack),
             ("像素与视图坐标往返一致",viewRectRoundTrip),
-            ("剪贴板写入成功路径",pasteboardFailureKeepsExistingContents),
+            ("复制替换旧剪贴板类型",pasteboardReplacesExistingContents),
             ("窗口图合成替换桌面像素",windowCompositeReplacesDesktopPixels),
             ("窗口图按窗口frame定位并可裁剪导出",windowCompositeUsesWindowFrameNotSelection)
         ]

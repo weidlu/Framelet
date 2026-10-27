@@ -37,7 +37,6 @@ extension NSColor {
     var onPhase: ((SessionPhase) -> Void)?
     private var activeRegionView: RegionView?
     private var sessionToken = UUID()
-    private var escapeMonitor: Any?
 
     init(settings: AppSettingsStore) { self.settings = settings }
 
@@ -153,30 +152,19 @@ extension NSColor {
                 prepared.append((window, view, screen))
             }
 
-            // Robust Esc: accept the key event when it targets any overlay, or
-            // when no key window exists yet but an overlay is on screen. This is
-            // the fallback that guarantees the session can always be exited.
+            // One routing point for the overlay. Text editors, modal panels and
+            // other application windows retain their own keyboard semantics.
             clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, !self.overlays.isEmpty else { return event }
-                // Never intercept keys meant for a modal panel or sheet.
+                guard let self, self.sessionToken == token, self.selectionContinuation != nil else { return event }
                 if NSApp.modalWindow != nil { return event }
-                if let window = event.window, window.isSheet { return event }
-                if event.window?.firstResponder is NSTextView { return event }
-                if let window = event.window, self.overlays.contains(window),
-                   let view = window.contentView as? RegionView {
-                    return view.handleKey(event) ? nil : event
-                }
-                if let keyWindow = NSApp.keyWindow, self.overlays.contains(keyWindow),
-                   let view = keyWindow.contentView as? RegionView {
-                    return view.handleKey(event) ? nil : event
-                }
-                if NSApp.keyWindow == nil, let view = self.activeRegionView {
-                    return view.handleKey(event) ? nil : event
-                }
+                if let window = event.window, !self.overlays.contains(window) { return event }
+                if (event.window ?? NSApp.keyWindow)?.firstResponder is NSTextView { return event }
+                let view = (event.window?.contentView as? RegionView) ?? self.activeRegionView
+                if let view { return view.handleKey(event) ? nil : event }
+                if event.keyCode == 53 { self.finish(.success(.cancelled)); return nil }
                 return event
             }
 
-            self.installEscapeFallback(token: token)
             self.present(prepared: prepared, selectFullScreen: selectFullScreen,
                          targetRect: targetRect, windowImage: windowImage,
                          windowName: windowName, preset: preset, token: token)
@@ -291,29 +279,6 @@ extension NSColor {
         }
     }
 
-    /// Last-resort Esc handling. The local monitor in `runRegion` only sees
-    /// events that reach the overlay; if activation or key status failed, this
-    /// app-level monitor still guarantees the user can leave the session.
-    private func installEscapeFallback(token: UUID) {
-        removeEscapeFallback()
-        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.sessionToken == token, self.selectionContinuation != nil else { return event }
-            guard event.keyCode == 53 else { return event }
-            // A modal save panel (or any sheet) owns its own Esc semantics.
-            if NSApp.modalWindow != nil { return event }
-            if let window = event.window, window.isSheet { return event }
-            if event.window?.firstResponder is NSTextView { return event }
-            if let view = self.activeRegionView {
-                if view.handleKey(event) { return nil }
-                return event
-            }
-            // No interactive overlay view at all: tear the session down.
-            OverlayDiag.log("escapeFallback: no active region view, cancelling session")
-            self.finish(.success(.cancelled))
-            return nil
-        }
-    }
-
     /// Forcefully ends any live session (used on quit) so no overlay or event
     /// monitor can outlive the app.
     func cancelActiveSession() {
@@ -322,20 +287,19 @@ extension NSColor {
         finish(.success(.cancelled))
     }
 
-    private func removeEscapeFallback() {
-        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
-        escapeMonitor = nil
-    }
-
     private func finish(_ result: Result<CaptureOutcome, Error>) {
         guard let continuation = selectionContinuation else { return }
         selectionContinuation = nil
         activeRegionView = nil
         sessionToken = UUID()
         if let monitor = clickMonitor { NSEvent.removeMonitor(monitor) }; clickMonitor = nil
-        removeEscapeFallback()
-        for window in overlays { window.orderOut(nil); window.contentView = nil }
+        for window in overlays {
+            window.discardCursorRects()
+            window.orderOut(nil)
+            window.contentView = nil
+        }
         overlays.removeAll()
+        NSCursor.arrow.set()
         continuation.resume(with: result)
     }
 
@@ -414,7 +378,8 @@ private final class RegionView: NSView {
     private var committing = false
     private var exited = false
     private var pendingEditDocument: CaptureDocument?
-    private var previousSelection: CGRect?
+    private let selectionChrome = CaptureSelectionChrome(frame: .zero)
+    private var pointerTracking: NSTrackingArea?
 
     private var selection: CGRect? {
         guard let a = start, let b = current else { return nil }
@@ -433,6 +398,8 @@ private final class RegionView: NSView {
         self.presentPanel = presentPanel
         self.onPhase = onPhase
         super.init(frame: .zero)
+        selectionChrome.autoresizingMask = [.width, .height]
+        addSubview(selectionChrome)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
 
@@ -446,8 +413,38 @@ private final class RegionView: NSView {
     }
     private var drewOnce = false
     override func resetCursorRects() {
-        OverlayDiag.log("RegionView.resetCursorRects bounds=\(NSStringFromRect(bounds))")
-        addCursorRect(bounds, cursor: .crosshair)
+        addCursorRect(bounds, cursor: document == nil && !exited ? .crosshair : .arrow)
+        if let selection, let document {
+            addCursorRect(selection, cursor: document.tool == nil ? .openHand : (document.tool == .text ? .iBeam : .crosshair))
+        }
+        if let toolbar { addCursorRect(toolbar.frame, cursor: .arrow) }
+    }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let pointerTracking { removeTrackingArea(pointerTracking) }
+        let tracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
+        addTrackingArea(tracking); pointerTracking = tracking
+    }
+    override func mouseMoved(with event: NSEvent) { updatePointer(at: convert(event.locationInWindow, from: nil)) }
+    override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
+    override func mouseExited(with event: NSEvent) { NSCursor.arrow.set() }
+
+    private func updatePointer(at point: CGPoint) {
+        if exited || toolbar?.frame.contains(point) == true { NSCursor.arrow.set(); return }
+        CaptureInteraction.pointer(at: point, selection: document == nil ? nil : selection,
+                                   tool: document?.tool, moving: moving != nil, resizing: resizing?.kind).cursor.set()
+    }
+
+    private func refreshSelectionUI() {
+        selectionChrome.frame = bounds
+        selectionChrome.selection = selection
+        selectionChrome.pixelSize = document?.selectionPixelRect.size ?? selection.map { CGSize(width: $0.width * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize), height: $0.height * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) } ?? .zero
+        selectionChrome.showHandles = document != nil && document?.tool == nil
+        selectionChrome.isHidden = selection == nil
+        needsDisplay = true
+        window?.invalidateCursorRects(for: self)
+        if let canvas { window?.invalidateCursorRects(for: canvas) }
+        if let window { updatePointer(at: convert(window.mouseLocationOutsideOfEventStream, from: nil)) }
     }
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -466,29 +463,9 @@ private final class RegionView: NSView {
         NSColor.black.withAlphaComponent(0.36).setFill(); bounds.fill()
         if let selection {
             ctx.saveGState(); ctx.clip(to: selection); ctx.draw(image, in: bounds); ctx.restoreGState()
-            drawSelectionBorder(selection)
-            drawSizeLabel(selection)
         } else {
             drawLabel("拖动选择区域 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 130), y: bounds.midY + 40))
         }
-    }
-
-    private func drawSelectionBorder(_ selection: CGRect) {
-        NSColor.white.setStroke()
-        let border = NSBezierPath(rect: selection); border.lineWidth = 1.5; border.stroke()
-        if document?.tool == nil {
-            NSColor.white.setFill()
-            for handle in CaptureGeometry.resizeHandles(for: selection) {
-                CGRect(x: handle.x - 4, y: handle.y - 4, width: 8, height: 8).fill()
-            }
-        }
-    }
-
-    private func drawSizeLabel(_ selection: CGRect) {
-        let scale = CGFloat(image.width) / max(1, bounds.width)
-        let label = "\(Int(selection.width * scale)) × \(Int(selection.height * scale))"
-        drawLabel(label, at: CGPoint(x: min(max(12, selection.minX), max(12, bounds.width - 160)),
-                                     y: min(bounds.height - 40, max(12, selection.maxY + 10))))
     }
 
     private func drawLabel(_ string: String, at point: CGPoint) {
@@ -508,7 +485,7 @@ private final class RegionView: NSView {
                 pendingEditDocument = document
                 resizing = (kind, selection)
                 canvas?.isHidden = true; toolbar?.isHidden = true
-                needsDisplay = true
+                refreshSelectionUI(); updatePointer(at: point)
                 return
             }
             if selection.contains(point) {
@@ -516,20 +493,17 @@ private final class RegionView: NSView {
                 pendingEditDocument = document
                 moving = (selection, point)
                 toolbar?.isHidden = true
-                needsDisplay = true
+                refreshSelectionUI(); updatePointer(at: point)
                 return
             }
-            // Clicking outside starts a fresh selection, but the current marks
-            // are only discarded once the new drag produces a usable rect.
-            previousSelection = selection
-            start = point; current = point
-            canvas?.isHidden = true; toolbar?.isHidden = true
-            needsDisplay = true
+            // A confirmed selection is stable. Only the explicit reselect action
+            // starts a new crop; clicks on the dimmed desktop do not edit it.
+            NSCursor.arrow.set()
             return
         }
         if document == nil {
             start = point; current = point
-            needsDisplay = true
+            refreshSelectionUI()
         }
     }
 
@@ -547,32 +521,19 @@ private final class RegionView: NSView {
             applySelection(CaptureGeometry.moved(selection: moving.rect, to: origin, bounds: bounds))
             return
         }
-        if previousSelection != nil || document == nil {
-            // Drawing a brand-new selection, either from scratch or by dragging
-            // outside the current one.
+        if document == nil {
+            // Only the initial capture or explicit reselect starts a new crop.
             current = CGPoint(x: max(0, min(bounds.width, point.x)), y: max(0, min(bounds.height, point.y)))
-            needsDisplay = true
+            refreshSelectionUI()
         }
     }
 
     override func mouseUp(with event: NSEvent) {
+        defer { refreshSelectionUI() }
         OverlayDiag.log("RegionView.mouseUp selection=\(selection.map { NSStringFromRect($0) } ?? "nil") document=\(document == nil ? "nil" : "set")")
         if document == nil, let selection {
             moving = nil; resizing = nil; pendingEditDocument = nil
             select(selection, name: "区域截图")
-            return
-        }
-        if let previous = previousSelection {
-            previousSelection = nil
-            if let newSelection = selection, newSelection.width >= 4, newSelection.height >= 4 {
-                select(newSelection, name: "区域截图")
-            } else {
-                start = previous.origin
-                current = CGPoint(x: previous.maxX, y: previous.maxY)
-                canvas?.isHidden = false; toolbar?.isHidden = false
-                repositionToolbar()
-                needsDisplay = true
-            }
             return
         }
         moving = nil; resizing = nil; pendingEditDocument = nil
@@ -596,7 +557,7 @@ private final class RegionView: NSView {
         current = CGPoint(x: rect.maxX, y: rect.maxY)
         canvas?.frame = rect
         document?.selectionPixelRect = CaptureGeometry.pixelRect(rect, viewBounds: bounds, imageSize: imageSize)
-        needsDisplay = true
+        refreshSelectionUI()
     }
 
     // MARK: Selection lifecycle
@@ -622,6 +583,9 @@ private final class RegionView: NSView {
                     + "window=\(windowImage.width)x\(windowImage.height) -> snapshot=\(image.width)x\(image.height)")
             } catch {
                 OverlayDiag.log("window composite FAILED \(error)")
+                showError(error)
+                cancelCapture()
+                return
             }
         }
         let scale = CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)
@@ -645,7 +609,8 @@ private final class RegionView: NSView {
         canvas.drawingEnabled = false
         canvas.frame = rect
         self.canvas = canvas
-        addSubview(canvas)
+        canvas.onCancel = { [weak self] in self?.handleCancelRequest() }
+        addSubview(canvas, positioned: .below, relativeTo: selectionChrome)
         let toolbarView = InlineCaptureToolbar(document: doc, settings: settings, chooseTool: { [weak self] tool in
             self?.setTool(tool)
         }, action: { [weak self] action in
@@ -666,7 +631,7 @@ private final class RegionView: NSView {
         toolbar = host
         addSubview(host)
         repositionToolbar()
-        needsDisplay = true
+        refreshSelectionUI()
         window?.makeFirstResponder(self)
     }
 
@@ -680,6 +645,7 @@ private final class RegionView: NSView {
             start = rect.origin
             current = CGPoint(x: rect.maxX, y: rect.maxY)
             canvas?.frame = rect
+            refreshSelectionUI()
         }
     }
 
@@ -687,8 +653,8 @@ private final class RegionView: NSView {
         document?.invalidate()
         canvas?.removeFromSuperview(); toolbar?.removeFromSuperview()
         canvas = nil; toolbar = nil; document = nil; documentObservation = nil
-        start = nil; current = nil; moving = nil; resizing = nil; pendingEditDocument = nil; previousSelection = nil
-        needsDisplay = true
+        start = nil; current = nil; moving = nil; resizing = nil; pendingEditDocument = nil
+        refreshSelectionUI()
     }
 
     private func setTool(_ tool: MarkTool?) {
@@ -697,7 +663,7 @@ private final class RegionView: NSView {
         canvas?.drawingEnabled = tool != nil
         if let canvas { window?.invalidateCursorRects(for: canvas) }
         repositionToolbar()
-        needsDisplay = true
+        refreshSelectionUI()
     }
 
     private func repositionToolbar() {
@@ -846,7 +812,7 @@ private final class RegionView: NSView {
     }
 
     /// Single cancel entry used by Esc, `cancelOperation`, the toolbar and the
-    /// app-level fallback. Cancels an in-progress stroke or text edit first and
+    /// local event router. Cancels an in-progress stroke or text edit first and
     /// keeps the session alive; otherwise exits the whole session.
     func handleCancelRequest() {
         if canvas?.cancelPendingStroke() == true { return }

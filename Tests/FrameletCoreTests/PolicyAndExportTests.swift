@@ -50,28 +50,14 @@ extension ImagingChecks {
         try expect(decoded.width == image.width && decoded.height == image.height, "pasteboard PNG round-trips at full size")
     }
 
-    static func pasteboardFailureKeepsExistingContents() throws {
-        // Encoding happens before clearContents, so a render/encode failure must
-        // not destroy what the user already had on the clipboard.
-        let name = NSPasteboard.Name("com.framelet.checks.atomic.\(UUID().uuidString)")
-        let pasteboard = NSPasteboard(name: name)
+    static func pasteboardReplacesExistingContents() throws {
+        let pasteboard = NSPasteboard(name: .init("com.framelet.checks.replace.\(UUID().uuidString)"))
         defer { pasteboard.releaseGlobally() }
-        pasteboard.clearContents()
-        pasteboard.setString("sentinel", forType: .string)
-        // A zero-sized image cannot be encoded, so this must throw.
-        let empty = try unwrap(Imaging.context(width: 1, height: 1)?.makeImage())
-        var threw = false
-        do {
-            // 1x1 is valid; simulate failure by passing an image the encoder
-            // rejects is not portable, so assert the ordering contract instead:
-            // the sentinel survives a successful write? No — a successful write
-            // replaces contents by design. Verify encode-before-clear via the
-            // success path clearing exactly once.
-            try Imaging.writePasteboard(empty, to: pasteboard)
-        } catch { threw = true }
-        try expect(!threw, "1x1 PNG should encode")
-        try expect(pasteboard.string(forType: .string) == nil, "successful write replaces clipboard contents")
-        try expect(pasteboard.data(forType: .png) != nil, "successful write leaves PNG data")
+        pasteboard.setString("previous clipboard", forType: .string)
+        let image = try unwrap(Imaging.context(width: 1, height: 1)?.makeImage())
+        try Imaging.writePasteboard(image, to: pasteboard)
+        try expect(pasteboard.string(forType: .string) == nil, "copy replaces the old clipboard types")
+        try expect(pasteboard.data(forType: .png) != nil && pasteboard.data(forType: .tiff) != nil, "replacement contains both native image types")
     }
 
     static func jpegFlattensTransparency() throws {
@@ -87,7 +73,7 @@ extension ImagingChecks {
                    "JPEG output has no alpha channel")
     }
 
-    static func settingsPersistAcrossReload() throws {
+    static func settingsEncodeDecodeRoundTrip() throws {
         // Simulate the on-disk path: encode → decode → repaired, twice.
         var settings = AppSettings.defaults
         settings.completionAction = .pin
