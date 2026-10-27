@@ -275,12 +275,14 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         startCapture { try await self.captureService.lastRegionCapture(last) }
     }
 
-    private func startCapture(_ operation: @escaping () async throws -> CaptureOutcome) {
+    private func startCapture(hiding windowsToHide: [NSWindow]? = nil, _ operation: @escaping () async throws -> CaptureOutcome) {
         OverlayDiag.log("startCapture state=\(sessionState) frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
         sessionState = .preparing
         busy = true
         let previousFrontmost = NSWorkspace.shared.frontmostApplication
-        let visible = NSApp.windows.filter { $0.isVisible && !pins.contains($0) }
+        // Only hide the launch UI. Settings and image windows are legitimate
+        // screenshot subjects and must remain visible in the frozen snapshot.
+        let visible = (windowsToHide ?? [home, picker].compactMap { $0 }).filter { $0.isVisible }
         visible.forEach { $0.orderOut(nil) }
         Task {
             defer { sessionState = .idle; busy = false; permission = CGPreflightScreenCaptureAccess() }
@@ -346,7 +348,8 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
 
     private func captureWindow(_ window: SCWindow) {
         guard sessionState == .idle else { return }
-        startCapture { try await self.captureService.region(window: window) }
+        let launchWindows = [home, picker].compactMap { $0 }.filter { $0.windowNumber != Int(window.windowID) }
+        startCapture(hiding: launchWindows) { try await self.captureService.region(window: window) }
     }
 
     // MARK: Home / settings / pin / image

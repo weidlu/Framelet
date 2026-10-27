@@ -47,8 +47,10 @@ extension NSColor {
         }
     }
 
-    private func screenshot(_ display: SCDisplay, excluding app: SCRunningApplication?) async throws -> CGImage {
-        let filter = SCContentFilter(display: display, excludingApplications: app.map { [$0] } ?? [], exceptingWindows: [])
+    private func screenshot(_ display: SCDisplay) async throws -> CGImage {
+        // Snapshot before creating the capture overlays. Settings, editors and
+        // pins are normal screen content, including when owned by Framelet.
+        let filter = SCContentFilter(display: display, excludingWindows: [])
         let config = SCStreamConfiguration()
         let scale = CGFloat(filter.pointPixelScale)
         config.width = max(1, Int(filter.contentRect.width * scale))
@@ -64,8 +66,7 @@ extension NSColor {
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
         let id = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         guard let display = content.displays.first(where: { $0.displayID == id }) ?? content.displays.first else { throw CaptureError.noDisplay }
-        let app = content.applications.first { $0.processID == ProcessInfo.processInfo.processIdentifier }
-        return try await screenshot(display, excluding: app)
+        return try await screenshot(display)
     }
 
     func region(selectFullScreen: Bool = false, window targetWindow: SCWindow? = nil) async throws -> CaptureOutcome {
@@ -112,11 +113,10 @@ extension NSColor {
         } else {
             try requirePermission()
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-            let app = content.applications.first { $0.processID == ProcessInfo.processInfo.processIdentifier }
             for screen in NSScreen.screens {
                 guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
                       let display = content.displays.first(where: { $0.displayID == id }) else { continue }
-                snapshots.append((screen, id, try await screenshot(display, excluding: app)))
+                snapshots.append((screen, id, try await screenshot(display)))
             }
         }
         guard !snapshots.isEmpty else { throw CaptureError.noDisplay }
@@ -306,7 +306,7 @@ extension NSColor {
     func windows() async throws -> [SCWindow] {
         try requirePermission()
         return try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true).windows
-            .filter { $0.owningApplication?.processID != ProcessInfo.processInfo.processIdentifier && $0.windowLayer == 0 && $0.frame.width > 60 && $0.frame.height > 40 }
+            .filter { $0.windowLayer == 0 && $0.frame.width > 60 && $0.frame.height > 40 }
             .sorted { ($0.owningApplication?.applicationName ?? "") < ($1.owningApplication?.applicationName ?? "") }
     }
 
