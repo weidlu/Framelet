@@ -1,0 +1,21 @@
+{
+  "version": "0.3.0",
+  "channel": "preview",
+  "name": "Framelet 0.3.0 预览版",
+  "releaseDate": "2026-10-27",
+  "minimumOS": "macOS 14.0 (Sonoma) 或更高版本",
+  "architecture": "Universal 2 (Apple Silicon M系列 & Intel Mac)",
+  "available": true,
+  "status": "released",
+  "statusMessage": "0.3.0 预览版已开放下载，安装包通过 Apple 公证。",
+  "fileName": "Framelet-0.3.0.dmg",
+  "url": "/downloads/Framelet-0.3.0.dmg",
+  "sha256": "9440b90d79eefa8b8ca05740dbf574cc1076691b775c7bdb75b143936f7e71c6",
+  "size": "2.1 MB",
+  "notarized": true,
+  "signingIdentity": "Developer ID Application",
+  "downloadNotice": "需在 macOS「系统设置 - 隐私与安全性」中授予屏幕录制权限，所有截图标注与 OCR 均在本地离线处理。",
+  "changelogUrl": "releases.html",
+  "signed": true,
+  "sizeBytes": 2214489
+}

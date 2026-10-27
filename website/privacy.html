@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>隐私政策与权限说明 — 拾影 · Framelet</title>
+  <meta name="description" content="拾影 / Framelet 的隐私说明：坚守本地优先，所有屏幕捕获与 Apple Vision OCR 文字识别完全在 Mac 本机进行；解释必要的屏幕录制权限，并如实说明网站托管基础日志。">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="assets/img/app-icon-128.png">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+
+  <!-- 顶部导航栏 -->
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a href="index.html" class="brand-link" aria-label="拾影 Framelet 官网首页">
+        <img src="assets/img/app-icon-128.png" alt="拾影 AppIcon" class="brand-icon" width="32" height="32">
+        <span>拾影 <span style="font-weight: 400; opacity: 0.85;">Framelet</span></span>
+      </a>
+
+      <nav aria-label="主导航">
+        <ul class="nav-links">
+          <li><a href="index.html#viewfinder-demo" class="nav-link">交互演示</a></li>
+          <li><a href="index.html#features" class="nav-link">功能特性</a></li>
+          <li><a href="releases.html" class="nav-link">版本说明</a></li>
+          <li><a href="privacy.html" class="nav-link active" style="color: var(--accent-iris);">隐私政策</a></li>
+        </ul>
+      </nav>
+
+      <a href="releases.html" class="nav-cta">
+        <span class="status-dot"></span>
+        <span>0.3.0 预览版</span>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-container">
+      <header class="page-header">
+        <h1 class="page-title">拾影隐私与数据安全说明</h1>
+        <div class="page-meta">
+          <span>适用版本：0.1.0 – 0.3.0 预览版</span>
+          <span>·</span>
+          <span>生效日期：2026年10月27日</span>
+          <span>·</span>
+          <span>独立分发版</span>
+        </div>
+      </header>
+
+      <article class="article-content">
+        <div class="alert-callout">
+          <strong>核心承诺：</strong>拾影（Framelet）是一款纯原生、本地运行的 macOS 工具。应用代码中<strong>没有任何用户账户体系、没有广告代码、没有第三方统计或分析 SDK、没有自动向外部服务器上传截图或文本的逻辑</strong>。您的所有截图、标注和识别文字都在您的 Mac 本机内存与芯片中运行。
+        </div>
+
+        <h2>一、系统权限与用途</h2>
+        <p>
+          在 macOS 系统安全机制下，截取屏幕内容属于受严格保护的行为。拾影在运行期间仅请求最少必要权限：
+        </p>
+        <ul>
+          <li>
+            <strong>屏幕录制权限（Screen Recording）</strong>：
+            当您主动发起区域截图、窗口截图、全屏截图或连续滚动长截图时，拾影调用系统级 <code>ScreenCaptureKit</code> 框架读取选定屏幕或窗口的像素帧。该权限由 macOS 统一管理，您可在「系统设置 - 隐私与安全性 - 屏幕录制」中随时查看或撤销。
+          </li>
+          <li>
+            <strong>无需且不申请的权限</strong>：
+            拾影<strong>当前版本不申请</strong>麦克风、摄像头、通讯录、日历、照片图库全权访问或地理位置等不相关的系统权限。
+          </li>
+        </ul>
+
+        <h2>二、图像处理与本机离线文字识别 (OCR)</h2>
+        <p>
+          拾影坚持「端侧优先、断网可用」的设计原则：
+        </p>
+        <ul>
+          <li>
+            <strong>内存级处理</strong>：截图与导入的图片仅在应用的独立进程内存中进行实时裁剪、标注和拼接渲染，应用会按您选择的完成方式复制或保存图像。
+          </li>
+          <li>
+            <strong>本机 Apple Vision 离线文字识别</strong>：文字提取功能基于 Apple 提供的系统原生 Vision 离线模型进行运算，无需联网，识别过程在本机完成，识别出的中英文字符不会被上传至任何云端模型。
+          </li>
+          <li>
+            <strong>单层栅格化导出</strong>：当您点击「保存」或「复制」时，应用将合成重新编码为单层的扁平位图（PNG/JPEG/TIFF），不保留可被逆向剥离的标注矢量图层。因此，使用「纯色遮挡」工具覆盖的密码、密钥或私人对话等敏感区域，在导出后无法通过图层分离还原。但请注意，<strong>马赛克属于图像模糊算法，不应作为绝对安全的强脱敏手段</strong>，高敏感信息请始终使用不透明的「遮挡」工具。
+          </li>
+        </ul>
+
+        <h2>三、数据存储与剪贴板流转</h2>
+        <ul>
+          <li>
+            <strong>文件导出</strong>：选择「保存」「保存并复制」，或启用相应完成方式后，图像会写入您指定的保存位置。应用还会在本机保存快捷键与其他偏好设置。
+          </li>
+          <li>
+            <strong>系统剪贴板</strong>：当您选择复制、保存并复制，或启用完成时同时复制后，图像或提取出的文字将被写入 macOS 系统的通用剪贴板（Pasteboard）。一旦进入系统剪贴板，其他获得剪贴板读取权限的本地第三方应用，或已开启的 Apple「通用剪贴板（Universal Clipboard）」设备的同步行为，由您的 macOS 系统配置与使用习惯决定。
+          </li>
+        </ul>
+
+        <h2>四、网站托管服务与基础访问日志</h2>
+        <div class="alert-callout warning">
+          <strong>网站访问：</strong>虽然拾影客户端软件本身完全不收集任何网络数据，但提供本软件介绍与分发信息的官方网站（<code>framelet.slnt.dev</code>）托管于 Cloudflare 边缘网络服务。
+        </div>
+        <p>
+          与互联网上绝大多数标准的 Web 静态服务一样，当您访问本官网或发起软件下载时，托管基础设施的服务器可能处理或记录基础的网络访问数据（包括访问者的公网 IP 地址、访问时间、请求的 URL 路径、HTTP 状态码以及浏览器发送的 User-Agent 等标准请求头）。这些日志属于边缘托管平台的标准运维日志，用于防护分布式拒绝服务（DDoS）攻击、维护网络安全与诊断网络分发故障。本网站不会在前端页面中植入任何第三方广告追踪或行为跟踪脚本（如 Google Analytics、百度统计等）。
+        </p>
+
+        <h2>五、Apple 开发者签名与公证说明</h2>
+        <p>
+          拾影的发布安装包采用经 Apple 认证的 <code>Developer ID Application</code> 证书进行代码签名，当前 0.3.0 安装包已通过 Apple 公证，详情见版本说明。公证会对提交的安装包进行自动化安全检查。开发者客观提示您：<strong>Apple 的代码签名与安全公证属于系统信任凭证，不应被夸大或误导性宣传为绝对的数据安全保证</strong>，最终的数据安全仍依赖于透明的代码实践与用户对系统权限的把控。
+        </p>
+
+        <h2>六、支持与反馈</h2>
+        <p>
+          如果您对本隐私说明或拾影的数据安全实现有任何疑问、改进意见或技术审阅建议，欢迎通过饮冰工作室官方渠道联系我们：
+        </p>
+        <ul>
+          <li>联系邮箱：<a href="mailto:contact@yinbingshi.com">contact@yinbingshi.com</a></li>
+          <li>工作室网站：<a href="https://yinbingshi.com" target="_blank" rel="noopener noreferrer">https://yinbingshi.com</a></li>
+          <li>产品主页：<a href="https://framelet.slnt.dev">https://framelet.slnt.dev</a></li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="assets/img/app-icon-128.png" alt="拾影 Logo" width="24" height="24" style="border-radius: 6px;">
+          <span>拾影 · Framelet</span>
+        </div>
+
+        <ul class="footer-links">
+          <li><a href="index.html">首页</a></li>
+          <li><a href="releases.html">版本说明</a></li>
+          <li><a href="privacy.html" style="color: var(--accent-iris);">隐私政策</a></li>
+          <li><a href="https://yinbingshi.com" target="_blank" rel="noopener noreferrer">饮冰工作室</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          © 2026 拾影 / Framelet. 独立开发并遵循本地优先原则。
+        </div>
+        <div style="color: var(--text-muted); font-size: 0.75rem;">
+          发布目标：<code>framelet.slnt.dev</code> · 本站托管于 Cloudflare 边缘网络
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
