@@ -17,6 +17,8 @@ import FrameletCore
             ("标注拖动限制在已确认选区",captureDrawingBoundary),
             ("窗口感应优先选择最前方窗口",windowHoverOrdering),
             ("单击选窗口与拖动框选阈值",windowClickVersusDrag),
+            ("像素瞄准 Retina/1x 坐标与导出边界",precisionPixelCoordinates),
+            ("放大镜四角取样与避让",precisionLoupeEdges),
             ("Retina 选区原点与倍率转换",retinaCrop),
             ("选区越界裁剪",clampedCrop),
             ("图像比例与居中",fitting),

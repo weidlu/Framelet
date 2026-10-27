@@ -182,8 +182,9 @@ extension NSColor {
                          windowName: String?, preset: LastRegion?, token: UUID) {
         guard sessionToken == token, selectionContinuation != nil else { return }
         for item in prepared {
-            item.window.orderFrontRegardless()
             item.view.refreshWindowHover()
+            item.window.displayIfNeeded()
+            item.window.orderFrontRegardless()
             OverlayDiag.log("reveal orderFrontRegardless \(OverlayDiag.describe(item.window))")
         }
         let target = prepared.first { NSMouseInRect(NSEvent.mouseLocation, $0.screen.frame, false) } ?? prepared.first
@@ -404,7 +405,8 @@ private final class RegionView: NSView {
     private var hoveredWindow: CaptureWindowCandidate?
     private var pressedWindow: CaptureWindowCandidate?
     private var pressPoint: CGPoint?
-    private var displayedSelection: CGRect? { selection ?? hoveredWindow?.frame }
+    private let precisionGuide: PrecisionCaptureGuide
+    private var displayedSelection: CGRect? { selection }
 
     private var selection: CGRect? {
         guard let a = start, let b = current else { return nil }
@@ -415,6 +417,7 @@ private final class RegionView: NSView {
          onFinish: @escaping (CaptureOutcome) -> Void, presentPanel: @escaping (NSSavePanel) -> NSApplication.ModalResponse,
          onPhase: ((SessionPhase) -> Void)? = nil) {
         self.image = image
+        self.precisionGuide = PrecisionCaptureGuide(image: image)
         self.imageSize = CGSize(width: image.width, height: image.height)
         self.screenFrame = screenFrame
         self.displayID = displayID
@@ -430,6 +433,8 @@ private final class RegionView: NSView {
         super.init(frame: .zero)
         selectionChrome.autoresizingMask = [.width, .height]
         addSubview(selectionChrome)
+        precisionGuide.autoresizingMask = [.width, .height]
+        addSubview(precisionGuide)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
 
@@ -461,15 +466,32 @@ private final class RegionView: NSView {
         updatePointer(at: point)
     }
     override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
-    override func mouseExited(with event: NSEvent) { NSCursor.arrow.set() }
+    override func mouseExited(with event: NSEvent) {
+        precisionGuide.point = nil
+        NSCursor.arrow.set()
+    }
 
     func refreshWindowHover(at point: CGPoint? = nil) {
         guard document == nil, start == nil, pressPoint == nil else { return }
         let point = point ?? convert(window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)
+        updatePrecisionGuide(at: point)
         let next = WindowSelection.target(at: point, candidates: windowCandidates)
         guard next?.id != hoveredWindow?.id else { return }
         hoveredWindow = next
+        updatePrecisionGuide(at: point)
         refreshSelectionUI()
+    }
+
+    private func alignedPoint(_ point: CGPoint) -> CGPoint {
+        PixelInspection.aligned(point, bounds: bounds, imageSize: imageSize)
+    }
+
+    private func updatePrecisionGuide(at point: CGPoint) {
+        precisionGuide.frame = bounds
+        precisionGuide.isHidden = document != nil || exited
+        precisionGuide.point = bounds.contains(point) ? alignedPoint(point) : nil
+        precisionGuide.candidate = hoveredWindow?.frame
+        precisionGuide.dragging = start != nil
     }
 
     private func updatePointer(at point: CGPoint) {
@@ -479,6 +501,10 @@ private final class RegionView: NSView {
     }
 
     private func refreshSelectionUI() {
+        precisionGuide.frame = bounds
+        precisionGuide.isHidden = document != nil || exited
+        precisionGuide.candidate = hoveredWindow?.frame
+        precisionGuide.dragging = start != nil
         selectionChrome.frame = bounds
         selectionChrome.selection = displayedSelection
         selectionChrome.pixelSize = document.map { CGSize(width: $0.pixelWidth, height: $0.pixelHeight) } ?? displayedSelection.map { CGSize(width: $0.width * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize), height: $0.height * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) } ?? .zero
@@ -502,24 +528,14 @@ private final class RegionView: NSView {
             OverlayDiag.log("RegionView.draw has no cgContext")
             return
         }
+        ctx.interpolationQuality = .none
         ctx.draw(image, in: bounds)
-        NSColor.black.withAlphaComponent(0.36).setFill(); bounds.fill()
-        if let selection = displayedSelection {
+        // Aiming leaves the frozen desktop at its original brightness. Only a
+        // real manual drag or confirmed selection introduces the outside mask.
+        if let selection {
+            NSColor.black.withAlphaComponent(0.36).setFill(); bounds.fill()
             ctx.saveGState(); ctx.clip(to: selection); ctx.draw(image, in: bounds); ctx.restoreGState()
-        } else {
-            drawLabel("拖动选择区域 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 130), y: bounds.midY + 40))
         }
-        if document == nil, hoveredWindow != nil {
-            drawLabel("单击或回车选窗口 · 拖动框选 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 170), y: 24))
-        }
-    }
-
-    private func drawLabel(_ string: String, at point: CGPoint) {
-        let value = NSAttributedString(string: string, attributes: [.font: NSFont.monospacedSystemFont(ofSize: 13, weight: .medium), .foregroundColor: NSColor.white])
-        let size = value.size()
-        NSColor.black.withAlphaComponent(0.8).setFill()
-        NSBezierPath(roundedRect: CGRect(x: point.x - 10, y: point.y - 7, width: size.width + 20, height: size.height + 14), xRadius: 7, yRadius: 7).fill()
-        value.draw(at: point)
     }
 
     // MARK: Mouse
@@ -548,7 +564,7 @@ private final class RegionView: NSView {
             return
         }
         if document == nil {
-            pressPoint = point
+            pressPoint = alignedPoint(point)
             pressedWindow = WindowSelection.target(at: point, candidates: windowCandidates)
             hoveredWindow = pressedWindow
             refreshSelectionUI()
@@ -556,7 +572,8 @@ private final class RegionView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
+        let point = alignedPoint(convert(event.locationInWindow, from: nil))
+        if document == nil { updatePrecisionGuide(at: point) }
         if let resizing {
             guard let newSelection = CaptureGeometry.resized(selection: resizing.original, kind: resizing.kind, to: point, bounds: bounds) else { return }
             recordPendingEditIfNeeded()
@@ -583,7 +600,7 @@ private final class RegionView: NSView {
         defer { refreshSelectionUI() }
         OverlayDiag.log("RegionView.mouseUp selection=\(selection.map { NSStringFromRect($0) } ?? "nil") document=\(document == nil ? "nil" : "set")")
         if document == nil {
-            let point = convert(event.locationInWindow, from: nil)
+            let point = alignedPoint(convert(event.locationInWindow, from: nil))
             if let pressPoint, WindowSelection.isDrag(from: pressPoint, to: point) {
                 start = pressPoint
                 current = CGPoint(x: max(0, min(bounds.width, point.x)), y: max(0, min(bounds.height, point.y)))
@@ -626,7 +643,11 @@ private final class RegionView: NSView {
     /// `windowViewRect` first, so the document and every export contain the
     /// window itself.
     func select(_ rect: CGRect, name: String, windowImage: CGImage? = nil, windowViewRect: CGRect? = nil) {
-        let rect = rect.standardized.intersection(bounds)
+        let clipped = rect.standardized.intersection(bounds)
+        guard !clipped.isNull else { resetSelection(); return }
+        let origin = alignedPoint(clipped.origin)
+        let end = alignedPoint(CGPoint(x: clipped.maxX, y: clipped.maxY))
+        let rect = CGRect(x: origin.x, y: origin.y, width: end.x - origin.x, height: end.y - origin.y)
         guard !rect.isNull, rect.width >= 4, rect.height >= 4 else { resetSelection(); return }
         onPhase?(.editing)
         hoveredWindow = nil; pressedWindow = nil; pressPoint = nil
