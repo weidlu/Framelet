@@ -8,6 +8,20 @@ import CoreGraphics
 ///   marks drawn by `Imaging`). Conversion to CGImage top-left happens only at
 ///   crop time.
 public enum CaptureGeometry {
+    /// Radius is expressed in the same units as `rect`, while pixelScale
+    /// keeps one-pixel selections intact on both 1x and Retina displays.
+    public static func selectionCornerRadius(_ requested: CGFloat, in rect: CGRect, pixelScale: CGFloat = 1) -> CGFloat {
+        guard requested.isFinite, pixelScale.isFinite, pixelScale > 0,
+              min(rect.width, rect.height) * pixelScale > 2 else { return 0 }
+        // Keep small selections recognizably rectangular instead of turning
+        // them into an ellipse when the chosen radius is larger than the box.
+        return min(max(0, requested), rect.width / 4, rect.height / 4)
+    }
+
+    public static func selectionPath(_ rect: CGRect, cornerRadius: CGFloat, pixelScale: CGFloat = 1) -> CGPath {
+        let radius = selectionCornerRadius(cornerRadius, in: rect, pixelScale: pixelScale)
+        return CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+    }
     /// Uniform scale factor from view points to full-image pixels.
     public static func scale(viewBounds: CGRect, imageSize: CGSize) -> CGFloat {
         guard viewBounds.width > 0, imageSize.width > 0 else { return 1 }

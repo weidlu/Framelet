@@ -131,7 +131,9 @@ private actor ScrollAssembly {
         finishing = true; paused = true
         Task {
             do {
-                let image = try await assembly.image()
+                let stitched = try await assembly.image()
+                let scale = region.selection.width > 0 ? CGFloat(stitched.width) / region.selection.width : 1
+                let image = try Imaging.roundedCorners(stitched, radius: CGFloat(settings.settings.effectiveSelectionCornerRadius) * scale)
                 guard continuation != nil else { return }
                 let action = settings.settings.completionAction
                 switch action {

@@ -10,6 +10,7 @@ final class PrecisionCaptureGuide: NSView {
     var candidate: CGRect? { didSet { needsDisplay = true } }
     var message: String? { didSet { needsDisplay = true } }
     var dragging = false { didSet { needsDisplay = true } }
+    var cornerRadius: CGFloat = 16 { didSet { needsDisplay = true } }
     init(image: CGImage) { self.image = image; super.init(frame: .zero) }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     override var isOpaque: Bool { false }
@@ -23,9 +24,13 @@ final class PrecisionCaptureGuide: NSView {
         // A hover target is only a thin outline. Never brighten/dim its area or
         // present editing handles before the user actually chooses it.
         if let candidate, !dragging {
-            ctx.setStrokeColor(NSColor.systemBlue.withAlphaComponent(0.8).cgColor)
-            ctx.setLineWidth(1)
-            ctx.stroke(candidate.insetBy(dx: 0.5, dy: 0.5))
+            ctx.setShouldAntialias(true)
+            let scale = CaptureGeometry.scale(viewBounds: bounds, imageSize: CGSize(width: image.width, height: image.height))
+            let radius = CaptureGeometry.selectionCornerRadius(cornerRadius, in: candidate, pixelScale: scale)
+            let outline = CaptureSelectionOutline.path(in: candidate.insetBy(dx: 0.5, dy: 0.5), cornerRadius: max(0, radius - 0.5), pixelScale: scale)
+            NSColor.systemBlue.withAlphaComponent(0.8).setStroke()
+            outline.lineWidth = 1; outline.stroke()
+            ctx.setShouldAntialias(false)
         }
         let path = CGMutablePath()
         path.move(to: CGPoint(x: bounds.minX, y: point.y)); path.addLine(to: CGPoint(x: bounds.maxX, y: point.y))

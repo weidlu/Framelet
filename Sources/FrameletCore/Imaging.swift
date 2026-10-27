@@ -120,7 +120,7 @@ public enum Imaging {
     /// image pixel coordinates). Marks live in full-image coordinates; they are
     /// composited before cropping to integral device-pixel boundaries. Marks
     /// outside the selection are cropped away without resampling its pixels.
-    public static func renderCropped(_ image: CGImage, marks: [Mark], selectionPixelRect: CGRect) throws -> CGImage {
+    public static func renderCropped(_ image: CGImage, marks: [Mark], selectionPixelRect: CGRect, cornerRadius: CGFloat = 0) throws -> CGImage {
         let selection = selectionPixelRect.standardized
             .intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
         guard !selection.isNull, selection.width >= 1, selection.height >= 1 else { throw ImagingError.render }
@@ -130,7 +130,24 @@ public enum Imaging {
         // doing so resamples screenshot text every time the selection moves.
         let composite = marks.isEmpty ? image : try render(image, marks: marks)
         guard let output = composite.cropping(to: crop) else { throw ImagingError.render }
-        return output
+        return try roundedCorners(output, radius: cornerRadius)
+    }
+
+    /// Mask only after cropping/compositing, so interior pixels and annotations
+    /// stay anchored and the corners are transparent in PNG and TIFF.
+    public static func roundedCorners(_ image: CGImage, radius: CGFloat) throws -> CGImage {
+        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let effective = CaptureGeometry.selectionCornerRadius(radius, in: bounds)
+        guard effective > 0 else { return image }
+        guard let ctx = context(width: image.width, height: image.height) else { throw ImagingError.render }
+        ctx.clear(bounds)
+        ctx.setShouldAntialias(true)
+        ctx.addPath(CaptureGeometry.selectionPath(bounds, cornerRadius: effective))
+        ctx.clip()
+        ctx.interpolationQuality = .none
+        ctx.draw(image, in: bounds)
+        guard let result = ctx.makeImage() else { throw ImagingError.render }
+        return result
     }
 
     /// Composites an independently captured window image into a frozen desktop

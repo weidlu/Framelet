@@ -207,6 +207,17 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 18) {
             LoginItemSettings()
             Divider()
+            Text("截图圆角").font(.headline)
+            HStack {
+                Text("直角").font(.system(size: 11)).foregroundStyle(.secondary)
+                Slider(value: Binding(get: { settings.settings.effectiveSelectionCornerRadius }, set: { settings.settings.selectionCornerRadius = $0 }), in: 0...32, step: 1)
+                    .frame(width: 180).accessibilityLabel("截图圆角大小")
+                Text("\(Int(settings.settings.effectiveSelectionCornerRadius)) pt")
+                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+            }
+            Text("截图时也可在选区左上角调整。PNG 和复制支持透明角；JPEG 会以白色填充。")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+            Divider()
             Text("完成动作").font(.headline)
             Text("右侧的结束按钮会显示所选动作；也可按 Enter 执行。⌘C 仅复制，保留当前选区。").font(.system(size: 11)).foregroundStyle(.secondary)
             Picker("完成动作", selection: Binding(get: { settings.settings.completionAction }, set: { settings.settings.completionAction = $0 })) {

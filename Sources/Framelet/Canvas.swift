@@ -178,7 +178,8 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         ctx.clear(bounds)
         ctx.saveGState(); defer { ctx.restoreGState() }
-        ctx.clip(to: selectionBounds)
+        ctx.addPath(CaptureGeometry.selectionPath(selectionBounds, cornerRadius: document.cornerRadius, pixelScale: document.scale))
+        ctx.clip()
         let output = (try? document.previewImage(pending: pending)) ?? document.fullImage
         ctx.interpolationQuality = .none
         ctx.draw(output, in: bounds)

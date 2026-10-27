@@ -163,7 +163,10 @@ extension NSColor {
                 if let window = event.window, !self.overlays.contains(window) { return event }
                 if (event.window ?? NSApp.keyWindow)?.firstResponder is NSTextView { return event }
                 let view = (event.window?.contentView as? RegionView) ?? self.activeRegionView
-                if let view { return view.handleKey(event) ? nil : event }
+                if let view {
+                    if (123...126).contains(Int(event.keyCode)), view.cornerSliderHasFocus() { return event }
+                    return view.handleKey(event) ? nil : event
+                }
                 if event.keyCode == 53 { self.finish(.success(.cancelled)); return nil }
                 return event
             }
@@ -401,6 +404,7 @@ private final class RegionView: NSView {
     private var exited = false
     private var pendingEditDocument: CaptureDocument?
     private let selectionChrome = CaptureSelectionChrome(frame: .zero)
+    private var cornerControls: NSHostingView<CaptureCornerControls>?
     private var pointerTracking: NSTrackingArea?
     private let windowCandidates: [CaptureWindowCandidate]
     private var hoveredWindow: CaptureWindowCandidate?
@@ -456,6 +460,7 @@ private final class RegionView: NSView {
             addCursorRect(selection, cursor: document.tool == nil ? .openHand : (document.tool == .text ? .iBeam : .crosshair))
         }
         if let toolbar { addCursorRect(toolbar.frame, cursor: .arrow) }
+        if let cornerControls { addCursorRect(cornerControls.frame, cursor: .arrow) }
     }
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -499,7 +504,7 @@ private final class RegionView: NSView {
     }
 
     private func updatePointer(at point: CGPoint) {
-        if exited || toolbar?.frame.contains(point) == true { NSCursor.arrow.set(); return }
+        if exited || toolbar?.frame.contains(point) == true || cornerControls?.frame.contains(point) == true { NSCursor.arrow.set(); return }
         CaptureInteraction.pointer(at: point, selection: document == nil ? nil : selection,
                                    tool: document?.tool, moving: moving != nil, resizing: resizing?.kind).cursor.set()
     }
@@ -509,11 +514,17 @@ private final class RegionView: NSView {
         precisionGuide.isHidden = document != nil || exited
         precisionGuide.candidate = hoveredWindow?.frame
         precisionGuide.dragging = start != nil
+        let radius = document?.cornerRadius ?? CGFloat(settings.settings.effectiveSelectionCornerRadius)
+        precisionGuide.cornerRadius = radius
         selectionChrome.frame = bounds
         selectionChrome.selection = displayedSelection
+        selectionChrome.cornerRadius = radius
+        selectionChrome.pixelScale = CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)
         selectionChrome.pixelSize = document.map { CGSize(width: $0.pixelWidth, height: $0.pixelHeight) } ?? displayedSelection.map { CGSize(width: $0.width * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize), height: $0.height * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) } ?? .zero
         selectionChrome.showHandles = document != nil && document?.tool == nil
+        selectionChrome.showLabel = document == nil
         selectionChrome.isHidden = displayedSelection == nil
+        repositionCornerControls()
         needsDisplay = true
         window?.invalidateCursorRects(for: self)
         if let canvas { window?.invalidateCursorRects(for: canvas) }
@@ -538,7 +549,10 @@ private final class RegionView: NSView {
         // real manual drag or confirmed selection introduces the outside mask.
         if let selection {
             NSColor.black.withAlphaComponent(0.36).setFill(); bounds.fill()
-            ctx.saveGState(); ctx.clip(to: selection); ctx.draw(image, in: bounds); ctx.restoreGState()
+            ctx.saveGState()
+            let radius = document?.cornerRadius ?? CGFloat(settings.settings.effectiveSelectionCornerRadius)
+            ctx.addPath(CaptureGeometry.selectionPath(selection, cornerRadius: radius, pixelScale: CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)))
+            ctx.clip(); ctx.draw(image, in: bounds); ctx.restoreGState()
         }
     }
 
@@ -550,7 +564,7 @@ private final class RegionView: NSView {
             if let kind = CaptureGeometry.handleKind(at: point, selection: selection) {
                 pendingEditDocument = document
                 resizing = (kind, selection)
-                canvas?.isHidden = true; toolbar?.isHidden = true
+                canvas?.isHidden = true; toolbar?.isHidden = true; cornerControls?.isHidden = true
                 refreshSelectionUI(); updatePointer(at: point)
                 return
             }
@@ -558,7 +572,7 @@ private final class RegionView: NSView {
                 if event.clickCount == 2 { performDoubleClick(); return }
                 pendingEditDocument = document
                 moving = (selection, point)
-                toolbar?.isHidden = true
+                toolbar?.isHidden = true; cornerControls?.isHidden = true
                 refreshSelectionUI(); updatePointer(at: point)
                 return
             }
@@ -619,7 +633,7 @@ private final class RegionView: NSView {
             return
         }
         moving = nil; resizing = nil; pendingEditDocument = nil
-        canvas?.isHidden = false; toolbar?.isHidden = false
+        canvas?.isHidden = false; toolbar?.isHidden = false; cornerControls?.isHidden = false
         repositionToolbar()
         needsDisplay = true
     }
@@ -661,7 +675,7 @@ private final class RegionView: NSView {
         // Discard the previous document so its late OCR result cannot surface.
         document?.invalidate()
         documentObservation = nil
-        canvas?.removeFromSuperview(); toolbar?.removeFromSuperview()
+        canvas?.removeFromSuperview(); toolbar?.removeFromSuperview(); cornerControls?.removeFromSuperview()
         if let windowImage, let windowViewRect {
             do {
                 image = try Imaging.compositeWindow(windowImage, into: image,
@@ -682,6 +696,7 @@ private final class RegionView: NSView {
                                   strokeWidth: CGFloat(settings.settings.strokeWidth),
                                   fontSize: CGFloat(settings.settings.fontSize))
         doc.scale = scale
+        doc.cornerRadius = CGFloat(settings.settings.effectiveSelectionCornerRadius)
         doc.selectionPixelRect = CaptureGeometry.pixelRect(rect, viewBounds: bounds, imageSize: imageSize)
         document = doc
         let sessionDoc = doc
@@ -690,6 +705,7 @@ private final class RegionView: NSView {
                 guard let self, let current = self.document, current === sessionDoc else { return }
                 self.syncSelectionFromDocument()
                 self.needsDisplay = true
+                self.refreshSelectionUI()
                 self.repositionToolbar()
             }
         }
@@ -700,6 +716,12 @@ private final class RegionView: NSView {
         self.canvas = canvas
         canvas.onCancel = { [weak self] in self?.handleCancelRequest() }
         addSubview(canvas, positioned: .below, relativeTo: selectionChrome)
+        let controls = NSHostingView(rootView: CaptureCornerControls(document: doc, settings: settings))
+        if #available(macOS 13.0, *) { controls.sizingOptions = [] }
+        controls.translatesAutoresizingMaskIntoConstraints = true
+        controls.autoresizingMask = []
+        cornerControls = controls
+        addSubview(controls, positioned: .above, relativeTo: selectionChrome)
         let toolbarView = InlineCaptureToolbar(document: doc, settings: settings, chooseTool: { [weak self] tool in
             self?.setTool(tool)
         }, action: { [weak self] action in
@@ -740,8 +762,8 @@ private final class RegionView: NSView {
 
     private func resetSelection() {
         document?.invalidate()
-        canvas?.removeFromSuperview(); toolbar?.removeFromSuperview()
-        canvas = nil; toolbar = nil; document = nil; documentObservation = nil
+        canvas?.removeFromSuperview(); toolbar?.removeFromSuperview(); cornerControls?.removeFromSuperview()
+        canvas = nil; toolbar = nil; cornerControls = nil; document = nil; documentObservation = nil
         start = nil; current = nil; moving = nil; resizing = nil; pendingEditDocument = nil
         pressPoint = nil; pressedWindow = nil; hoveredWindow = nil
         keyboardAim = nil; keyboardAnchor = nil
@@ -765,6 +787,17 @@ private final class RegionView: NSView {
         let preferred = CGSize(width: 664, height: showProps ? 86 : (document?.message != nil ? 77 : 45))
         let frame = CaptureLayout.toolbarFrame(selection: selection, screen: bounds, preferredSize: preferred)
         toolbar.frame = frame
+        repositionCornerControls()
+    }
+
+    private func repositionCornerControls() {
+        guard let controls = cornerControls, let selection else { return }
+        controls.frame = CaptureLayout.selectionControlsFrame(selection: selection, screen: bounds, preferredSize: CGSize(width: 240, height: 28), avoiding: toolbar?.frame)
+    }
+
+    func cornerSliderHasFocus() -> Bool {
+        guard let controls = cornerControls, let focused = window?.firstResponder as? NSView else { return false }
+        return focused === controls || focused.isDescendant(of: controls)
     }
 
     private func makeLastRegion() -> LastRegion? {

@@ -35,6 +35,7 @@ import FrameletCore
             ("悬浮工具栏优先放在选区下方",toolbarBelow),
             ("底部选区工具栏翻到上方",toolbarAbove),
             ("全屏和窄屏工具栏保持可操作",toolbarClamped),
+            ("选区尺寸和圆角控件靠近左上角",cornerControlsLayout),
             ("设置默认值与类型安全",settingsDefaults),
             ("设置往返与坏值修复",settingsRoundTripAndRepair),
             ("全局快捷键合法性",globalShortcutValidation),
@@ -42,6 +43,7 @@ import FrameletCore
             ("选区到像素坐标映射",cropGeometry),
             ("八点调整手柄几何",eightHandles),
             ("裁剪渲染保持标注锚点",croppedRenderKeepsAnchor),
+            ("圆角截图及 PNG/TIFF 透明角",roundedCaptureExport),
             ("小数像素选区裁剪保持原始像素",fractionalCropPreservesPixels),
             ("完成动作策略矩阵",completionPolicyMatrix),
             ("剪贴板同时写入 PNG 与 TIFF",pasteboardWritesPNGAndTIFF),
@@ -78,6 +80,46 @@ import FrameletCore
                 try expect(pixel(output, x: x, y: 5) == pixel(source, x: Int(crop.minX) + x, y: Int(crop.minY) + 5), "cropping resampled a sharp screenshot pixel at x=\(x)")
             }
         }
+    }
+    static func roundedCaptureExport() throws {
+        let ctx = try unwrap(Imaging.context(width: 100, height: 80))
+        ctx.setFillColor(NSColor.white.cgColor); ctx.fill(CGRect(x: 0, y: 0, width: 100, height: 80))
+        ctx.setFillColor(NSColor.red.cgColor); ctx.fill(CGRect(x: 15, y: 15, width: 50, height: 40))
+        let source = try unwrap(ctx.makeImage())
+        let selection = CGRect(x: 10, y: 10, width: 60, height: 50)
+        let marks = [Mark(tool: .redact, points: [CGPoint(x: 25, y: 25), CGPoint(x: 35, y: 35)])]
+        let square = try Imaging.renderCropped(source, marks: marks, selectionPixelRect: selection)
+        let rounded = try Imaging.renderCropped(source, marks: marks, selectionPixelRect: selection, cornerRadius: 16)
+        try expect(rounded.width == 60 && rounded.height == 50, "rounding must preserve output dimensions")
+        for (x, y) in [(0, 0), (59, 0), (0, 49), (59, 49)] {
+            try expect(try pixel(rounded, x: x, y: y)[3] == 0, "every outside corner is transparent")
+        }
+        try expect(try pixel(rounded, x: 30, y: 25) == pixel(square, x: 30, y: 25), "interior pixels and annotations stay unchanged")
+        var antialiased = false
+        for y in 0..<16 { for x in 0..<16 {
+            let alpha = try pixel(rounded, x: x, y: y)[3]
+            if alpha > 0 && alpha < 255 { antialiased = true }
+        }}
+        try expect(antialiased, "rounded edges should be antialiased")
+        let board = NSPasteboard(name: .init("com.framelet.checks.rounded.\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        try Imaging.writePasteboard(rounded, to: board)
+        for type in [NSPasteboard.PasteboardType.png, .tiff] {
+            let data = try unwrap(board.data(forType: type))
+            let imageSource = try unwrap(CGImageSourceCreateWithData(data as CFData, nil))
+            let decoded = try unwrap(CGImageSourceCreateImageAtIndex(imageSource, 0, nil))
+            try expect(try pixel(decoded, x: 0, y: 0)[3] == 0, "clipboard PNG and TIFF preserve transparent corners")
+            try expect(try pixel(decoded, x: 30, y: 25) == pixel(square, x: 30, y: 25), "clipboard preserves interior")
+        }
+        let originalSquare = try Imaging.roundedCorners(square, radius: 0)
+        try expect(try pixel(originalSquare, x: 0, y: 0) == pixel(square, x: 0, y: 0), "zero radius preserves square pixels")
+        let onePixel = try unwrap(source.cropping(to: CGRect(x: 0, y: 0, width: 1, height: 1)))
+        let onePixelRounded = try Imaging.roundedCorners(onePixel, radius: 32)
+        try expect(try pixel(onePixelRounded, x: 0, y: 0) == pixel(onePixel, x: 0, y: 0), "single-pixel selections must not become transparent")
+        let retinaRect = CGRect(x: 0, y: 0, width: 120, height: 100)
+        let largeRetinaRect = CGRect(x: 0, y: 0, width: 300, height: 200)
+        try expect(CaptureGeometry.selectionCornerRadius(32, in: largeRetinaRect) == 32, "16pt at 2x uses 32 pixel radius")
+        try expect(CaptureGeometry.selectionCornerRadius(999, in: retinaRect) == 25, "small selections stay rectangular")
     }
     static func clampedCrop() throws {
         let rect = Imaging.cropRect(selection: CGRect(x: -10,y: -20,width: 110,height: 120),screenSize: CGSize(width: 1000,height: 600),imageSize: CGSize(width: 2000,height: 1200))
@@ -133,6 +175,27 @@ import FrameletCore
             try expect(screen.contains(toolbar),"full-screen toolbar escapes display bounds")
             try expect(toolbar.width <= screen.width-24,"narrow screen toolbar must fit")
         }
+    }
+    static func cornerControlsLayout() throws {
+        let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
+        let size = CGSize(width: 240, height: 28)
+        let selection = CGRect(x: 100, y: 300, width: 400, height: 200)
+        let above = CaptureLayout.selectionControlsFrame(selection: selection, screen: screen, preferredSize: size)
+        try expect(above.minX == selection.minX && above.minY == selection.maxY + 6, "controls sit beside the upper-left corner")
+        let nearTop = CGRect(x: 900, y: 500, width: 100, height: 300)
+        let inside = CaptureLayout.selectionControlsFrame(selection: nearTop, screen: screen, preferredSize: size)
+        try expect(screen.contains(inside), "controls stay visible near top and right edges")
+        try expect(inside.maxY <= nearTop.maxY, "no room above means controls move inside")
+        let fullScreen = CaptureLayout.selectionControlsFrame(selection: screen, screen: screen, preferredSize: size)
+        try expect(screen.contains(fullScreen), "full-screen selection keeps controls visible")
+        let nearBottom = CGRect(x: 100, y: 10, width: 400, height: 100)
+        let toolbar = CaptureLayout.toolbarFrame(selection: nearBottom, screen: screen, preferredSize: CGSize(width: 664, height: 45))
+        let controls = CaptureLayout.selectionControlsFrame(selection: nearBottom, screen: screen, preferredSize: size, avoiding: toolbar)
+        try expect(screen.contains(controls) && !controls.intersects(toolbar), "corner controls must not be hidden by a toolbar above a bottom-edge selection")
+        let tiny = CGRect(x: 100, y: 0, width: 10, height: 10)
+        let tinyToolbar = CaptureLayout.toolbarFrame(selection: tiny, screen: screen, preferredSize: CGSize(width: 664, height: 45))
+        let tinyControls = CaptureLayout.selectionControlsFrame(selection: tiny, screen: screen, preferredSize: size, avoiding: tinyToolbar)
+        try expect(screen.contains(tinyControls) && !tinyControls.intersects(tinyToolbar), "tiny bottom selections keep controls usable")
     }
     static func whiteImage() throws -> CGImage {
         let context = try unwrap(Imaging.context(width: 64,height: 64))

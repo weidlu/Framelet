@@ -8,6 +8,7 @@ extension ImagingChecks {
         try expect(defaults.schemaVersion == AppSettings.currentSchemaVersion, "schema version")
         try expect(defaults.completionAction == .copy, "default completion copies")
         try expect(defaults.copyOnSave && defaults.copyOnPin, "default copy on save/pin")
+        try expect(defaults.effectiveSelectionCornerRadius == 16, "selection defaults to a moderate rounded corner")
         try expect(defaults.globalShortcuts[.region]??.keyCode == 0x15, "default region key ⌃⌥4")
         try expect(defaults.globalShortcuts[.fullscreen]??.keyCode == 0x14, "default fullscreen key ⌃⌥3")
         try expect(defaults.toolShortcuts[.move]??.keyCode == 0x09, "default move key V")
@@ -22,15 +23,26 @@ extension ImagingChecks {
         let decoded = try unwrap(AppSettings.from(data: data))
         try expect(decoded == settings, "round-trip preserves typed settings")
 
+        settings.selectionCornerRadius = 0
+        let square = try unwrap(AppSettings.from(data: try unwrap(settings.encode())))
+        try expect(square.effectiveSelectionCornerRadius == 0 && square.completionAction == .saveAndCopy, "square corner setting persists without changing other preferences")
+        var legacy = try unwrap(JSONSerialization.jsonObject(with: try unwrap(settings.encode())) as? [String: Any])
+        legacy.removeValue(forKey: "selectionCornerRadius")
+        let migrated = try unwrap(AppSettings.from(data: try JSONSerialization.data(withJSONObject: legacy)))
+        try expect(migrated.effectiveSelectionCornerRadius == 16, "existing preferences default to rounded corners")
+        try expect(migrated.completionAction == .saveAndCopy && migrated.globalShortcuts[.window] == settings.globalShortcuts[.window], "existing preferences survive migration")
+
         var corrupt = AppSettings.defaults
         corrupt.jpegQuality = 42
         corrupt.strokeWidth = 999
+        corrupt.selectionCornerRadius = 999
         corrupt.globalShortcuts[.window] = HotKeyCombo(keyCode: 0x20) // bare key: invalid global
         corrupt.globalShortcuts[.lastRegion] = HotKeyCombo(keyCode: 0x21, modifiers: HotKeyModifier.shift.rawValue) // shift-only: invalid
         corrupt.toolShortcuts[.pin] = HotKeyCombo(keyCode: 0x09) // duplicates move V: invalid tool key
         let repaired = corrupt.repaired
         try expect(repaired.jpegQuality == 1.0, "jpeg quality clamped")
         try expect(repaired.strokeWidth == 24, "stroke width clamped")
+        try expect(repaired.selectionCornerRadius == 32, "corner radius clamped")
         try expect(repaired.globalShortcuts[.window] == nil, "bare global key rejected")
         try expect(repaired.globalShortcuts[.lastRegion] == nil, "shift-only global key rejected")
         try expect(repaired.toolShortcuts[.pin] == nil, "duplicate tool key rejected")

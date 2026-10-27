@@ -136,6 +136,10 @@ public struct AppSettings: Codable, Equatable {
     public var fontSize: Double
     public var annotationColor: RGBValue
     public var lastRegion: LastRegion?
+    // Optional so preferences saved before this setting existed still decode.
+    public var selectionCornerRadius: Double?
+    /// AppKit points; zero preserves square corners. Old preferences default to 16.
+    public var effectiveSelectionCornerRadius: Double { min(32, max(0, selectionCornerRadius ?? 16)) }
 
     public init(schemaVersion: Int = AppSettings.currentSchemaVersion,
                 completionAction: CompletionAction = .copy,
@@ -150,7 +154,8 @@ public struct AppSettings: Codable, Equatable {
                 strokeWidth: Double = 5,
                 fontSize: Double = 16,
                 annotationColor: RGBValue = .defaultInk,
-                lastRegion: LastRegion? = nil) {
+                lastRegion: LastRegion? = nil,
+                selectionCornerRadius: Double? = 16) {
         self.schemaVersion = schemaVersion
         self.completionAction = completionAction
         self.doubleClickAction = doubleClickAction
@@ -165,6 +170,7 @@ public struct AppSettings: Codable, Equatable {
         self.fontSize = fontSize
         self.annotationColor = annotationColor
         self.lastRegion = lastRegion
+        self.selectionCornerRadius = selectionCornerRadius
     }
 
     public static let defaults = AppSettings()
@@ -212,6 +218,7 @@ public struct AppSettings: Codable, Equatable {
         copy.jpegQuality = min(max(copy.jpegQuality, 0.05), 1.0)
         copy.strokeWidth = min(max(copy.strokeWidth, 2), 24)
         copy.fontSize = min(max(copy.fontSize, 8), 64)
+        if let radius = copy.selectionCornerRadius { copy.selectionCornerRadius = min(max(radius, 0), 32) }
         copy.annotationColor.red = min(max(copy.annotationColor.red, 0), 1)
         copy.annotationColor.green = min(max(copy.annotationColor.green, 0), 1)
         copy.annotationColor.blue = min(max(copy.annotationColor.blue, 0), 1)

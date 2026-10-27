@@ -13,6 +13,8 @@ import FrameletCore
     let name: String
     /// Pixels per view point for the display this selection lives on.
     var scale: CGFloat = 1
+    /// The same radius in view points drives the preview and pixel export.
+    @Published var cornerRadius: CGFloat = 16
     /// Selection in full-image pixel coordinates (bottom-left origin), updated
     /// by the overlay as the selection moves/resizes.
     @Published var selectionPixelRect: CGRect = .zero
@@ -87,7 +89,7 @@ import FrameletCore
     var canUndo: Bool { !undoStack.isEmpty }
 
     func flattened() throws -> CGImage {
-        try Imaging.renderCropped(previewImage(), marks: [], selectionPixelRect: selectionPixelRect)
+        try Imaging.renderCropped(previewImage(), marks: [], selectionPixelRect: selectionPixelRect, cornerRadius: cornerRadius * scale)
     }
 
     /// Full-resolution composite anchored to the display. Selection geometry
