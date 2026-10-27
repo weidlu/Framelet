@@ -16,6 +16,11 @@ final class ShortcutRecorderView: NSView {
     override var acceptsFirstResponder: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let tracking { removeTrackingArea(tracking) }
@@ -106,10 +111,13 @@ final class ShortcutRecorderView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let hovering = bounds.contains(convert(window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil))
-        let background = recording ? NSColor.systemBlue.withAlphaComponent(0.14) : (hovering ? NSColor.controlAccentColor.withAlphaComponent(0.08) : NSColor(white: 0.96, alpha: 1))
-        let border = recording ? NSColor.systemBlue : (hovering ? NSColor.controlAccentColor : NSColor(white: 0.80, alpha: 1))
+        let background = NSColor.controlBackgroundColor
+        let border = recording || hovering ? NSColor.controlAccentColor : NSColor.separatorColor
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
         background.setFill(); path.fill()
+        if recording || hovering {
+            NSColor.controlAccentColor.withAlphaComponent(recording ? 0.14 : 0.08).setFill(); path.fill()
+        }
         border.setStroke(); path.lineWidth = 1; path.stroke()
         let text: String
         let color: NSColor

@@ -106,6 +106,7 @@ extension NSColor {
         guard !capturing else { return .cancelled }
         capturing = true; defer { capturing = false }
         var snapshots: [(NSScreen, UInt32, CGImage)] = []
+        var windowCandidates: [CaptureWindowCandidate] = []
         if let overrideSnapshots {
             guard let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main else { throw CaptureError.noDisplay }
             let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) ?? 0
@@ -113,6 +114,7 @@ extension NSColor {
         } else {
             try requirePermission()
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            windowCandidates = Self.windowCandidates(content.windows)
             for screen in NSScreen.screens {
                 guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
                       let display = content.displays.first(where: { $0.displayID == id }) else { continue }
@@ -134,7 +136,7 @@ extension NSColor {
                 window.title = "截图 · Framelet"
                 window.level = .screenSaver
                 window.acceptsMouseMovedEvents = true
-                let view = RegionView(image: image, screenFrame: screen.frame, displayID: displayID, settings: settings) { [weak self] outcome in
+                let view = RegionView(image: image, screenFrame: screen.frame, displayID: displayID, settings: settings, windowCandidates: windowCandidates) { [weak self] outcome in
                     self?.finish(.success(outcome))
                 } presentPanel: { [weak self] panel in
                     guard let self else { return .cancel }
@@ -181,6 +183,7 @@ extension NSColor {
         guard sessionToken == token, selectionContinuation != nil else { return }
         for item in prepared {
             item.window.orderFrontRegardless()
+            item.view.refreshWindowHover()
             OverlayDiag.log("reveal orderFrontRegardless \(OverlayDiag.describe(item.window))")
         }
         let target = prepared.first { NSMouseInRect(NSEvent.mouseLocation, $0.screen.frame, false) } ?? prepared.first
@@ -310,6 +313,23 @@ extension NSColor {
             .sorted { ($0.owningApplication?.applicationName ?? "") < ($1.owningApplication?.applicationName ?? "") }
     }
 
+    private static func windowCandidates(_ windows: [SCWindow]) -> [CaptureWindowCandidate] {
+        let byID = Dictionary(windows.map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
+        let desktopTop = NSScreen.screens.map(\.frame.maxY).max() ?? 0
+        // CGWindowList is ordered front-to-back. Snapshot once, before overlays
+        // exist; mouse movement never needs another screen or AX query.
+        let ordered = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        return ordered.compactMap { info in
+            guard let id = (info[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
+                  let window = byID[id], window.windowLayer == 0,
+                  window.frame.width > 60, window.frame.height > 40 else { return nil }
+            let frame = CGRect(x: window.frame.minX, y: desktopTop - window.frame.maxY,
+                               width: window.frame.width, height: window.frame.height)
+            return CaptureWindowCandidate(id: id, frame: frame,
+                                          name: window.title?.isEmpty == false ? window.title! : (window.owningApplication?.applicationName ?? "窗口截图"))
+        }
+    }
+
     func window(_ window: SCWindow) async throws -> CGImage {
         let filter = SCContentFilter(desktopIndependentWindow: window)
         let config = SCStreamConfiguration()
@@ -380,13 +400,18 @@ private final class RegionView: NSView {
     private var pendingEditDocument: CaptureDocument?
     private let selectionChrome = CaptureSelectionChrome(frame: .zero)
     private var pointerTracking: NSTrackingArea?
+    private let windowCandidates: [CaptureWindowCandidate]
+    private var hoveredWindow: CaptureWindowCandidate?
+    private var pressedWindow: CaptureWindowCandidate?
+    private var pressPoint: CGPoint?
+    private var displayedSelection: CGRect? { selection ?? hoveredWindow?.frame }
 
     private var selection: CGRect? {
         guard let a = start, let b = current else { return nil }
         return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
     }
 
-    init(image: CGImage, screenFrame: CGRect, displayID: UInt32, settings: AppSettingsStore,
+    init(image: CGImage, screenFrame: CGRect, displayID: UInt32, settings: AppSettingsStore, windowCandidates: [CaptureWindowCandidate] = [],
          onFinish: @escaping (CaptureOutcome) -> Void, presentPanel: @escaping (NSSavePanel) -> NSApplication.ModalResponse,
          onPhase: ((SessionPhase) -> Void)? = nil) {
         self.image = image
@@ -394,6 +419,11 @@ private final class RegionView: NSView {
         self.screenFrame = screenFrame
         self.displayID = displayID
         self.settings = settings
+        self.windowCandidates = windowCandidates.compactMap { candidate in
+            let visible = candidate.frame.intersection(screenFrame)
+            guard !visible.isNull, visible.width >= 4, visible.height >= 4 else { return nil }
+            return CaptureWindowCandidate(id: candidate.id, frame: visible.offsetBy(dx: -screenFrame.minX, dy: -screenFrame.minY), name: candidate.name)
+        }
         self.onFinish = onFinish
         self.presentPanel = presentPanel
         self.onPhase = onPhase
@@ -425,9 +455,22 @@ private final class RegionView: NSView {
         let tracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
         addTrackingArea(tracking); pointerTracking = tracking
     }
-    override func mouseMoved(with event: NSEvent) { updatePointer(at: convert(event.locationInWindow, from: nil)) }
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        refreshWindowHover(at: point)
+        updatePointer(at: point)
+    }
     override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
     override func mouseExited(with event: NSEvent) { NSCursor.arrow.set() }
+
+    func refreshWindowHover(at point: CGPoint? = nil) {
+        guard document == nil, start == nil, pressPoint == nil else { return }
+        let point = point ?? convert(window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)
+        let next = WindowSelection.target(at: point, candidates: windowCandidates)
+        guard next?.id != hoveredWindow?.id else { return }
+        hoveredWindow = next
+        refreshSelectionUI()
+    }
 
     private func updatePointer(at point: CGPoint) {
         if exited || toolbar?.frame.contains(point) == true { NSCursor.arrow.set(); return }
@@ -437,10 +480,10 @@ private final class RegionView: NSView {
 
     private func refreshSelectionUI() {
         selectionChrome.frame = bounds
-        selectionChrome.selection = selection
-        selectionChrome.pixelSize = document.map { CGSize(width: $0.pixelWidth, height: $0.pixelHeight) } ?? selection.map { CGSize(width: $0.width * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize), height: $0.height * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) } ?? .zero
+        selectionChrome.selection = displayedSelection
+        selectionChrome.pixelSize = document.map { CGSize(width: $0.pixelWidth, height: $0.pixelHeight) } ?? displayedSelection.map { CGSize(width: $0.width * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize), height: $0.height * CaptureGeometry.scale(viewBounds: bounds, imageSize: imageSize)) } ?? .zero
         selectionChrome.showHandles = document != nil && document?.tool == nil
-        selectionChrome.isHidden = selection == nil
+        selectionChrome.isHidden = displayedSelection == nil
         needsDisplay = true
         window?.invalidateCursorRects(for: self)
         if let canvas { window?.invalidateCursorRects(for: canvas) }
@@ -461,10 +504,13 @@ private final class RegionView: NSView {
         }
         ctx.draw(image, in: bounds)
         NSColor.black.withAlphaComponent(0.36).setFill(); bounds.fill()
-        if let selection {
+        if let selection = displayedSelection {
             ctx.saveGState(); ctx.clip(to: selection); ctx.draw(image, in: bounds); ctx.restoreGState()
         } else {
             drawLabel("拖动选择区域 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 130), y: bounds.midY + 40))
+        }
+        if document == nil, hoveredWindow != nil {
+            drawLabel("单击选窗口 · 拖动框选 · Esc 取消", at: CGPoint(x: max(20, bounds.midX - 140), y: 24))
         }
     }
 
@@ -502,7 +548,9 @@ private final class RegionView: NSView {
             return
         }
         if document == nil {
-            start = point; current = point
+            pressPoint = point
+            pressedWindow = WindowSelection.target(at: point, candidates: windowCandidates)
+            hoveredWindow = pressedWindow
             refreshSelectionUI()
         }
     }
@@ -522,7 +570,10 @@ private final class RegionView: NSView {
             return
         }
         if document == nil {
+            guard let pressPoint, WindowSelection.isDrag(from: pressPoint, to: point) else { return }
             // Only the initial capture or explicit reselect starts a new crop.
+            start = pressPoint
+            hoveredWindow = nil
             current = CGPoint(x: max(0, min(bounds.width, point.x)), y: max(0, min(bounds.height, point.y)))
             refreshSelectionUI()
         }
@@ -531,9 +582,18 @@ private final class RegionView: NSView {
     override func mouseUp(with event: NSEvent) {
         defer { refreshSelectionUI() }
         OverlayDiag.log("RegionView.mouseUp selection=\(selection.map { NSStringFromRect($0) } ?? "nil") document=\(document == nil ? "nil" : "set")")
-        if document == nil, let selection {
+        if document == nil {
+            let point = convert(event.locationInWindow, from: nil)
+            if let pressPoint, WindowSelection.isDrag(from: pressPoint, to: point) {
+                start = pressPoint
+                current = CGPoint(x: max(0, min(bounds.width, point.x)), y: max(0, min(bounds.height, point.y)))
+            }
+            let chosen = selection ?? pressedWindow?.frame
+            let name = selection == nil ? (pressedWindow?.name ?? "窗口截图") : "区域截图"
+            pressPoint = nil; pressedWindow = nil; hoveredWindow = nil
             moving = nil; resizing = nil; pendingEditDocument = nil
-            select(selection, name: "区域截图")
+            if let chosen { select(chosen, name: name) }
+            else { refreshWindowHover() }
             return
         }
         moving = nil; resizing = nil; pendingEditDocument = nil
@@ -569,6 +629,7 @@ private final class RegionView: NSView {
         let rect = rect.standardized.intersection(bounds)
         guard !rect.isNull, rect.width >= 4, rect.height >= 4 else { resetSelection(); return }
         onPhase?(.editing)
+        hoveredWindow = nil; pressedWindow = nil; pressPoint = nil
         start = rect.origin; current = CGPoint(x: rect.maxX, y: rect.maxY)
         // Discard the previous document so its late OCR result cannot surface.
         document?.invalidate()
@@ -655,6 +716,8 @@ private final class RegionView: NSView {
         canvas?.removeFromSuperview(); toolbar?.removeFromSuperview()
         canvas = nil; toolbar = nil; document = nil; documentObservation = nil
         start = nil; current = nil; moving = nil; resizing = nil; pendingEditDocument = nil
+        pressPoint = nil; pressedWindow = nil; hoveredWindow = nil
+        refreshWindowHover()
         refreshSelectionUI()
     }
 

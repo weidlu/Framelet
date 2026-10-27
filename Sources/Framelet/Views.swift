@@ -205,6 +205,8 @@ struct SettingsView: View {
 
     private var captureTab: some View {
         VStack(alignment: .leading, spacing: 18) {
+            LoginItemSettings()
+            Divider()
             Text("完成动作").font(.headline)
             Text("右侧的结束按钮会显示所选动作；也可按 Enter 执行。⌘C 仅复制，保留当前选区。").font(.system(size: 11)).foregroundStyle(.secondary)
             Picker("完成动作", selection: Binding(get: { settings.settings.completionAction }, set: { settings.settings.completionAction = $0 })) {

@@ -8,7 +8,7 @@ import FrameletCore
         let app = NSApplication.shared
         let delegate = AppController()
         app.delegate = delegate
-        app.setActivationPolicy(.regular)
+        app.setActivationPolicy(.accessory)
         app.run()
         _ = delegate
     }
@@ -56,7 +56,12 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
             }
         }
         applyHotKeys()
-        showHome()
+        // Menu-bar utility: no Dock icon or launch panel on normal/login starts.
+        // Show setup once; reopening the application explicitly opens settings.
+        if !UserDefaults.standard.bool(forKey: "framelet.menuBarSetupShown") {
+            UserDefaults.standard.set(true, forKey: "framelet.menuBarSetupShown")
+            showSettings()
+        }
         // Local verification hooks: launch straight into a screen for manual
         // acceptance runs without needing synthetic input events.
         let arguments = ProcessInfo.processInfo.arguments
@@ -82,7 +87,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         }
     }
 
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showHome(); return true }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showSettings(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Never trap the app in a stuck capture session: tear it down and quit.

@@ -15,6 +15,8 @@ import FrameletCore
         let checks: [(String,() throws -> Void)] = [
             ("截图阶段与鼠标光标一致",capturePointerPhases),
             ("标注拖动限制在已确认选区",captureDrawingBoundary),
+            ("窗口感应优先选择最前方窗口",windowHoverOrdering),
+            ("单击选窗口与拖动框选阈值",windowClickVersusDrag),
             ("Retina 选区原点与倍率转换",retinaCrop),
             ("选区越界裁剪",clampedCrop),
             ("图像比例与居中",fitting),
