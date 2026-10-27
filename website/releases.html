@@ -39,7 +39,7 @@
       <header class="page-header">
         <h1 class="page-title">版本发布记录与分发说明</h1>
         <div class="page-meta">
-          <span>当前分支：0.3.0 预览版</span>
+          <span>当前分支：0.3.1 预览版</span>
           <span>·</span>
           <span>分发途径：官网独立 DMG 下载</span>
           <span>·</span>
@@ -54,7 +54,7 @@
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 1.1rem; color: var(--text-main);">
               <span class="status-dot"></span>
-              <span>Framelet 0.3.0 预览版构建状态</span>
+              <span>Framelet 0.3.1 预览版构建状态</span>
             </div>
             <span class="brand-badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.3);">已通过 Apple 公证</span>
           </div>
@@ -65,6 +65,14 @@
             目标架构: Universal 2 (arm64 + x86_64) | 最低支持: macOS Sonoma 14.0+
           </div>
         </div>
+
+        <h2>v0.3.1 预览版 (2026-10-28)</h2>
+        <ul>
+          <li>选区左上角新增圆角滑块，支持直角到常用圆角，并记住上次设置。</li>
+          <li>截图和长截图导出支持圆角；PNG 和剪贴板图像保留透明角。JPEG 不支持透明角，会填充白色。</li>
+          <li>选区靠近屏幕边缘时，圆角滑块会避让标注工具栏。</li>
+          <li>项目源代码以 MIT 许可证开源：<a href="https://github.com/weidlu/Framelet">查看 GitHub 仓库</a>。</li>
+        </ul>
 
         <!-- 0.3.0 详细更新日志 -->
         <h2>v0.3.0 预览版 (2026-10-27)</h2>
@@ -135,9 +143,9 @@
         <p>
           下载后可在终端执行以下命令，并与下方校验值核对：
         </p>
-        <p><a class="btn-primary" href="/downloads/Framelet-0.3.0.dmg">下载 Framelet 0.3.0 · 2.1 MB</a></p>
-<pre><code>shasum -a 256 Framelet-0.3.0.dmg</code></pre>
-<p>SHA-256：</p><pre style="overflow-wrap:anywhere;white-space:pre-wrap"><code>9440b90d79eefa8b8ca05740dbf574cc1076691b775c7bdb75b143936f7e71c6</code></pre>
+        <p><a class="btn-primary" href="/downloads/Framelet-0.3.1.dmg">下载 Framelet 0.3.1 · 2.2 MB</a></p>
+<pre><code>shasum -a 256 Framelet-0.3.1.dmg</code></pre>
+<p>SHA-256：</p><pre style="overflow-wrap:anywhere;white-space:pre-wrap"><code>9853d97e5fa6d71f003a63c1c5b93fa6e1b5094edfaa728a3984ae344d1242b0</code></pre>
         <p>
           如需校验 Apple Developer ID 签名与公证票据状态，可执行：
         </p>

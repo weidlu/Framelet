@@ -1,23 +1,31 @@
 # 拾影 · Framelet
 
-独立开发的 macOS 截图与标注工具，官网分发方向。当前版本 **0.2.0 预览版**，要求 macOS 14 或更高版本。
+拾影是一款 macOS 截图与标注工具，平时在菜单栏运行。截图、标注、长图拼接和文字识别都在本机处理。
 
-所有产品代码由本项目独立实现；没有包含 iShot 的代码、图片、资源、二进制或授权逻辑。工作名尚未进行商标和域名核验。
+[官网与下载](https://framelet.slnt.dev) · [使用说明](docs/使用说明.txt) · [隐私说明](https://framelet.slnt.dev/privacy.html)
 
-## 已实现
+当前版本为 **0.3.1 预览版**，支持 macOS 14 及以上的 Apple Silicon 和 Intel Mac。
 
-- 区域截图：拖出选区后原地显示悬浮工具栏；不再自动打开独立编辑窗口。支持多显示器选区、Retina 像素坐标转换、Esc 取消。
-- 全屏截图：鼠标所在显示器全选，使用同一套原地工具栏，排除拾影自己的窗口。
-- 窗口截图：列出可见应用窗口，截取后在窗口对应位置显示工具栏。
-- 箭头、方框、圆圈、自由画笔、文字、马赛克、不透明遮挡；撤销与重做。
-- PNG/JPEG 保存、复制合并后的 PNG、浮动贴图。
-- Apple Vision 中文/英文 OCR，支持编辑和复制识别结果。
-- 轻量截图面板：区域、窗口、全屏三个入口；菜单栏常驻，全局快捷键 `Control+Option+4` / `Control+Option+3`。
-- 权限引导、未保存标注关闭提示、图片导入与文档打开。
+## 功能
 
-截图不自动存盘，不自动上传；OCR 在设备上运行。导出图像是重新编码的单层图像，不带可撤销的标注层或原始图像附件。敏感内容使用「遮挡」，马赛克不作为安全脱敏承诺。
+- 区域、窗口、全屏和上次区域截图；长十字准星、像素放大镜和逐像素键盘微调。
+- 选区左上角滑块调整截图圆角，最左为直角；PNG 和剪贴板图像支持透明角。
+- 截图后原地标注箭头、矩形、圆圈、画笔、文字、马赛克与不透明遮挡。
+- 手动连续滚动拼接长截图并查看实时预览；3、5、10 秒延时截图与 HEX/RGB 取色。
+- 本机中英文 OCR、截图贴图、可自定义全局快捷键与登录启动。
+- 导出 PNG 或 JPEG；JPEG 不支持透明，圆角外部以白色填充。
 
-## 构建和验证
+长截图适用于纵向滚动的相对静止内容。大面积空白、重复纹理、视频或过快滚动可能无法匹配；当前不包含录屏、翻译和自动更新。
+
+## 使用
+
+从[官网](https://framelet.slnt.dev)下载安装，将拾影拖进“应用程序”。首次截图需要按 macOS 提示授予屏幕录制权限。默认快捷键为 `Control+Option+4`（区域）和 `Control+Option+3`（全屏），可在设置中更改。
+
+选区确定后，在左上角尺寸旁调整圆角；在下方工具栏标注，点击完成或按 Enter 执行设置的完成动作。Esc 取消，`Command+C` 复制但保留选区。
+
+## 构建与验证
+
+需要 macOS、Apple Swift 工具链和 macOS SDK：
 
 ```sh
 bash scripts/swift.sh run FrameletChecks
@@ -25,36 +33,20 @@ bash scripts/build.sh
 open dist/Framelet.app
 ```
 
-需要 Apple Swift 工具链和 macOS SDK。`scripts/swift.sh` 对部分升级的 CLT 中旧版 private swiftinterface 提供工作区内兼容处理，不修改系统工具链。完整 Xcode 可用于 IDE 调试，但当前构建不依赖 xcodebuild。
-
-同时构建 Intel 与 Apple Silicon：
+构建 Apple Silicon 和 Intel 通用版本：
 
 ```sh
 UNIVERSAL=1 bash scripts/build.sh
 ```
 
-有 Developer ID Application 证书时：
+本地默认使用临时签名。对外分发需要自己的 Developer ID 签名及 Apple 公证；有关环境变量见 [使用说明](docs/使用说明.txt)和 `scripts/`。不要把证书私钥、密码或公证凭据放入仓库。
 
-```sh
-SIGNING_IDENTITY='Developer ID Application: 你的证书名称 (TEAMID)' UNIVERSAL=1 bash scripts/build.sh
-SIGNING_IDENTITY='Developer ID Application: 你的证书名称 (TEAMID)' bash scripts/package.sh
-NOTARY_PROFILE='钥匙串配置名' bash scripts/notarize.sh dist/Framelet-0.2.0.dmg
-```
+## 隐私与支持
 
-正式 bundle ID 可通过 `BUNDLE_ID` 指定。公证凭据只保存在钥匙串中，不进入代码或配置。`notarize.sh` 会向 Apple 上传指定安装包，需要账号所有者授权；不会上传截图或用户数据，不会公开发布安装包。
+拾影不要求账号，不自动上传截图。保存、复制和贴图按所选操作执行；使用系统剪贴板后，其他应用及通用剪贴板可能读取或同步内容。敏感内容建议使用不透明遮挡，马赛克不能保证安全脱敏。
 
-## 首次运行
+问题和建议可提交 GitHub Issue，或联系 [contact@yinbingshi.com](mailto:contact@yinbingshi.com)。
 
-1. 将 `.app` 拖入 Applications，打开。
-2. 点击「区域截图」，按系统提示允许屏幕录制。若系统要求，退出后重开。
-3. 拖出选区后，在悬浮工具栏直接标注。右侧按钮显示设置的完成动作（默认「复制」），Enter 执行并退出，Esc 取消。保存有独立入口；「更多操作」中提供提取文字、贴图、重做和重新选择。窄屏下部分标注工具也收进菜单，不需要横向滚动。文字在选区内点击输入，Enter 确认。
-4. 设置分为截图、快捷键、保存、权限与关于，界面跟随系统深浅色。已有图片仍可通过「文件 → 打开图片」标注，不占用截图面板。
-5. 关闭截图面板后仍通过菜单栏运行；`Command+Q` 完全退出。
+## 许可证
 
-## 发布范围
-
-本版不含长截图、录屏、声音内录、翻译、自动更新、登录启动、自定义快捷键、裁剪或可编辑工程文件。没有为这些功能放置付费入口或占位按钮。
-
-官网公开分发前，需完成真实截图权限流程、真实多显示器和 Intel 机器验收、Apple 公证、名称及域名确认，并替换支持联系方式。见 [发布检查](docs/发布检查.md)。没有配置托管和下载域名，尚未上线官网。
-
-自动化测试覆盖坐标与裁剪、导出格式、遮挡像素和马赛克叠加遮挡。构建通过不代表所有设备上的截图权限与显示行为已通过验收。
+源代码采用 [MIT License](LICENSE)。

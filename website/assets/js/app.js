@@ -70,7 +70,7 @@ function initDownloadState() {
         downloadBtn.classList.add('btn-pending');
         downloadBtn.removeAttribute('href');
         downloadBtn.setAttribute('aria-disabled', 'true');
-        downloadBtn.innerHTML = `<span>下载即将开放 (v0.3.0 预览版)</span>`;
+        downloadBtn.innerHTML = `<span>下载即将开放 (v0.3.1 预览版)</span>`;
       }
     });
 }

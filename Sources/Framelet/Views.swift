@@ -177,7 +177,7 @@ struct SettingsView: View {
                     }.buttonStyle(QuietButtonStyle()).accessibilityAddTraits(tab == index ? [.isSelected] : [])
                 }
                 Spacer()
-                Text("Framelet 0.3.0").font(.system(size: 10)).foregroundStyle(Palette.muted).padding(12)
+                Text("Framelet \(FrameletVersion.current)").font(.system(size: 10)).foregroundStyle(Palette.muted).padding(12)
             }.padding(12).frame(width: 162).background(Palette.paper)
             Divider()
             ScrollView {
@@ -310,7 +310,7 @@ struct SettingsView: View {
             if let notice = settings.repairNotice {
                 Text(notice).font(.caption).foregroundStyle(.orange)
             }
-            Text("拾影 · Framelet 0.3.0").font(.system(size: 13, weight: .semibold))
+            Text("拾影 · Framelet \(FrameletVersion.current)").font(.system(size: 13, weight: .semibold))
             Text("macOS 14 或更高版本。无需账号，截图与文字识别均在本机完成。").font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
         }
     }

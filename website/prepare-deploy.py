@@ -16,11 +16,14 @@ shutil.copytree(source / 'assets', target / 'assets')
 metadata = json.loads((source / 'release.json').read_text())
 if metadata['available']:
     assert metadata['notarized'] is True
-    package = project / 'dist' / metadata['fileName']
-    digest = hashlib.sha256(package.read_bytes()).hexdigest()
-    assert digest == metadata['sha256'], 'Published package hash does not match release metadata'
     download = target / 'downloads'
     download.mkdir()
-    shutil.copy2(package, download / package.name)
-    (download / (package.name + '.sha256')).write_text(f'{digest}  {package.name}\n')
+    # Preserve links for older publicly released versions. Refuse to deploy if
+    # any expected package is missing or does not match its recorded checksum.
+    for release in [metadata, *metadata.get('previousReleases', [])]:
+        package = project / 'dist' / release['fileName']
+        digest = hashlib.sha256(package.read_bytes()).hexdigest()
+        assert digest == release['sha256'], f'Package hash does not match metadata: {package.name}'
+        shutil.copy2(package, download / package.name)
+        (download / (package.name + '.sha256')).write_text(f'{digest}  {package.name}\n')
 print(f'Public assets: {target} ({sum(p.is_file() for p in target.rglob("*"))} files)')

@@ -3,6 +3,10 @@ import SwiftUI
 import ScreenCaptureKit
 import FrameletCore
 
+enum FrameletVersion {
+    static let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发版"
+}
+
 @main enum FrameletMain {
     @MainActor static func main() {
         let app = NSApplication.shared
@@ -466,7 +470,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         else { currentDocument?.copy() }
     }
     @objc private func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "拾影 · Framelet", .applicationVersion: "0.3.0", .credits: NSAttributedString(string: "截图，留住重点。\n本地处理 · 无账号 · 无付费墙")])
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "拾影 · Framelet", .applicationVersion: FrameletVersion.current, .credits: NSAttributedString(string: "截图，留住重点。\n本地处理 · 无账号 · 无付费墙")])
     }
 
     func showError(_ error: Error) {
