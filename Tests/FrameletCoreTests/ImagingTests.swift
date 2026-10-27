@@ -28,7 +28,16 @@ import FrameletCore
             ("全局快捷键合法性",globalShortcutValidation),
             ("选区到像素坐标映射",cropGeometry),
             ("八点调整手柄几何",eightHandles),
-            ("裁剪渲染保持标注锚点",croppedRenderKeepsAnchor)
+            ("裁剪渲染保持标注锚点",croppedRenderKeepsAnchor),
+            ("完成动作策略矩阵",completionPolicyMatrix),
+            ("剪贴板同时写入 PNG 与 TIFF",pasteboardWritesPNGAndTIFF),
+            ("JPEG 展平透明背景",jpegFlattensTransparency),
+            ("设置重启后保持",settingsPersistAcrossReload),
+            ("未知或损坏设置不崩溃",unknownEnumFallsBack),
+            ("像素与视图坐标往返一致",viewRectRoundTrip),
+            ("剪贴板写入成功路径",pasteboardFailureKeepsExistingContents),
+            ("窗口图合成替换桌面像素",windowCompositeReplacesDesktopPixels),
+            ("窗口图按窗口frame定位并可裁剪导出",windowCompositeUsesWindowFrameNotSelection)
         ]
         for (name,run) in checks { try run(); print("PASS \(name)") }
         print("\(checks.count) 项检查全部通过")

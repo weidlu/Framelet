@@ -85,8 +85,18 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { pending = nil; needsDisplay = true } else { super.keyDown(with: event) }
+        if event.keyCode == 53 { _ = cancelPendingStroke() } else { super.keyDown(with: event) }
     }
+
+    /// Drops the in-progress stroke (if any) and reports whether one existed.
+    @discardableResult
+    func cancelPendingStroke() -> Bool {
+        guard pending != nil else { return false }
+        pending = nil; needsDisplay = true
+        return true
+    }
+
+    var isEditingText: Bool { textField != nil }
     private func beginText(at point: CGPoint, viewPoint: CGPoint) {
         commitText()
         let width = min(260, max(80, bounds.width-viewPoint.x))
@@ -98,6 +108,15 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         textPosition = point; textField = field
         addSubview(field); window?.makeFirstResponder(field)
     }
+    /// Abandons the current text entry without adding a mark (Esc semantics).
+    func abandonText() {
+        guard let field = textField else { return }
+        textField = nil; textPosition = nil
+        field.delegate = nil; field.removeFromSuperview()
+        window?.makeFirstResponder(self)
+        needsDisplay = true
+    }
+
     func commitText() {
         guard let field = textField else { return }
         let value = field.stringValue
@@ -181,8 +200,18 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { pending = nil; needsDisplay = true } else { super.keyDown(with: event) }
+        if event.keyCode == 53 { _ = cancelPendingStroke() } else { super.keyDown(with: event) }
     }
+
+    /// Drops the in-progress stroke (if any) and reports whether one existed.
+    @discardableResult
+    func cancelPendingStroke() -> Bool {
+        guard pending != nil else { return false }
+        pending = nil; needsDisplay = true
+        return true
+    }
+
+    var isEditingText: Bool { textField != nil }
 
     private func beginText(at point: CGPoint, viewPoint: CGPoint) {
         commitText()
@@ -195,6 +224,15 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
         field.backgroundColor = .white; field.isBezeled = true
         textPosition = point; textField = field
         addSubview(field); window?.makeFirstResponder(field)
+    }
+
+    /// Abandons the current text entry without adding a mark (Esc semantics).
+    func abandonText() {
+        guard let field = textField else { return }
+        textField = nil; textPosition = nil
+        field.delegate = nil; field.removeFromSuperview()
+        window?.makeFirstResponder(self)
+        needsDisplay = true
     }
 
     func commitText() {

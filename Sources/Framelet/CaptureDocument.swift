@@ -15,7 +15,7 @@ import FrameletCore
     var scale: CGFloat = 1
     /// Selection in full-image pixel coordinates (bottom-left origin), updated
     /// by the overlay as the selection moves/resizes.
-    var selectionPixelRect: CGRect = .zero
+    @Published var selectionPixelRect: CGRect = .zero
     @Published private(set) var marks: [Mark] = []
     @Published var tool: MarkTool? = nil
     @Published var color: NSColor
@@ -25,8 +25,15 @@ import FrameletCore
     @Published var recognizing = false
     @Published var ocrText: String?
     @Published var showOCR = false
-    private var redoMarks: [Mark] = []
     private(set) var sessionID = UUID()
+    private var valid = true
+    private var undoStack: [Snapshot] = []
+    private var redoStack: [Snapshot] = []
+
+    struct Snapshot {
+        var marks: [Mark]
+        var selection: CGRect
+    }
 
     init(fullImage: CGImage, name: String, color: NSColor, strokeWidth: CGFloat, fontSize: CGFloat) {
         self.fullImage = fullImage
@@ -39,11 +46,39 @@ import FrameletCore
     var pixelWidth: Int { max(1, Int(selectionPixelRect.width.rounded())) }
     var pixelHeight: Int { max(1, Int(selectionPixelRect.height.rounded())) }
 
-    func append(_ mark: Mark) { marks.append(mark); redoMarks.removeAll() }
-    func undo() { if let last = marks.popLast() { redoMarks.append(last) } }
-    func redo() { if let last = redoMarks.popLast() { marks.append(last) } }
-    var canRedo: Bool { !redoMarks.isEmpty }
-    var canUndo: Bool { !marks.isEmpty }
+    /// Marks the document as discarded so late OCR results cannot reopen UI for
+    /// a session that already ended.
+    func invalidate() { valid = false }
+    var isActive: Bool { valid }
+
+    private var snapshot: Snapshot { Snapshot(marks: marks, selection: selectionPixelRect) }
+
+    /// Records the pre-edit state so undo/redo covers both annotation and
+    /// selection adjustments in one timeline.
+    func beginEdit() {
+        undoStack.append(snapshot)
+        if undoStack.count > 200 { undoStack.removeFirst(undoStack.count - 200) }
+        redoStack.removeAll()
+    }
+
+    func append(_ mark: Mark) { beginEdit(); marks.append(mark) }
+
+    func undo() {
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(snapshot)
+        marks = previous.marks
+        selectionPixelRect = previous.selection
+    }
+
+    func redo() {
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(snapshot)
+        marks = next.marks
+        selectionPixelRect = next.selection
+    }
+
+    var canRedo: Bool { !redoStack.isEmpty }
+    var canUndo: Bool { !undoStack.isEmpty }
 
     func flattened() throws -> CGImage {
         try Imaging.renderCropped(fullImage, marks: marks, selectionPixelRect: selectionPixelRect)
@@ -69,7 +104,7 @@ import FrameletCore
         Task { [weak self] in
             let result = try? await OCR.recognize(image)
             await MainActor.run {
-                guard let self, self.sessionID == id else { return } // stale session
+                guard let self, self.isActive, self.sessionID == id else { return } // stale session
                 self.recognizing = false
                 guard let result else {
                     self.message = "文字识别失败，请重试。"
@@ -109,14 +144,11 @@ extension RGBValue {
 /// touching the pasteboard, and write both PNG and TIFF so native targets can
 /// paste reliably.
 enum CaptureExporter {
+    /// Single production write path; `Imaging.writePasteboard` is shared with the
+    /// checks so tests exercise the real implementation against an isolated
+    /// pasteboard instead of duplicating it.
     static func writePasteboard(_ image: CGImage) throws {
-        let png = try Imaging.data(image, type: .png)
-        let nsImage = NSImage(cgImage: image, size: .zero)
-        guard let tiff = nsImage.tiffRepresentation else { throw ImagingError.export }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        guard pasteboard.setData(png, forType: .png) else { throw ImagingError.export }
-        pasteboard.setData(tiff, forType: .tiff)
+        try Imaging.writePasteboard(image, to: .general)
     }
 
     static func writeFile(_ image: CGImage, to url: URL, format: SaveFormat, quality: Double) throws {

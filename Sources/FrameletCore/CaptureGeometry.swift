@@ -15,11 +15,23 @@ public enum CaptureGeometry {
     }
 
     /// Maps a view-points rect to full-image pixel rect (bottom-left origin).
+    /// The result is relative to `viewBounds.origin`, so displays with negative
+    /// global origins map to the same image pixels as the primary display.
     public static func pixelRect(_ rect: CGRect, viewBounds: CGRect, imageSize: CGSize) -> CGRect {
         guard viewBounds.width > 0, viewBounds.height > 0 else { return .zero }
         let sx = imageSize.width / viewBounds.width
         let sy = imageSize.height / viewBounds.height
-        return CGRect(x: rect.minX * sx, y: rect.minY * sy, width: rect.width * sx, height: rect.height * sy)
+        return CGRect(x: (rect.minX - viewBounds.minX) * sx, y: (rect.minY - viewBounds.minY) * sy,
+                      width: rect.width * sx, height: rect.height * sy)
+    }
+
+    /// Inverse of `pixelRect`: image pixels back to view points.
+    public static func viewRect(_ pixelRect: CGRect, viewBounds: CGRect, imageSize: CGSize) -> CGRect {
+        guard imageSize.width > 0, imageSize.height > 0 else { return .zero }
+        let sx = viewBounds.width / imageSize.width
+        let sy = viewBounds.height / imageSize.height
+        return CGRect(x: pixelRect.minX * sx + viewBounds.minX, y: pixelRect.minY * sy + viewBounds.minY,
+                      width: pixelRect.width * sx, height: pixelRect.height * sy)
     }
 
     /// CGImage top-left-origin crop rect for a bottom-left-origin image rect.

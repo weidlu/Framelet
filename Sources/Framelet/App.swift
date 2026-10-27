@@ -39,12 +39,16 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DebugLog.configure()
+        OverlayDiag.start()
+        DebugLog.write("launched, args=\(ProcessInfo.processInfo.arguments)")
         buildMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem?.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "拾影")
         statusItem?.menu = captureMenu()
         keys.onTrigger = { [weak self] action in self?.run(action) }
         captureService.onPhase = { [weak self] phase in
+            OverlayDiag.log("onPhase \(phase)")
             switch phase {
             case .selecting: self?.sessionState = .selecting
             case .editing: self?.sessionState = .editing
@@ -53,13 +57,36 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         }
         applyHotKeys()
         showHome()
-        if ProcessInfo.processInfo.arguments.contains("--demo") { showDemo() }
+        // Local verification hooks: launch straight into a screen for manual
+        // acceptance runs without needing synthetic input events.
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--demo") { showDemo() }
+        if arguments.contains("--settings") { showSettings() }
+        // Verification hook: start a capture directly so the overlay can be
+        // inspected without synthetic input events.
+        if let index = arguments.firstIndex(of: "--capture"), arguments.indices.contains(index + 1) {
+            let mode = arguments[index + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                guard let self else { return }
+                switch mode {
+                case "full": self.capture(.full)
+                case "window": self.chooseWindow()
+                case "synthetic": self.captureSynthetic()
+                default: self.capture(.region)
+                }
+            }
+        }
+        if let index = arguments.firstIndex(of: "--settings-tab"), arguments.indices.contains(index + 1),
+           let tab = Int(arguments[index + 1]) {
+            showSettings(tab: tab)
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showHome(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if sessionState != .idle { return .terminateCancel }
+        // Never trap the app in a stuck capture session: tear it down and quit.
+        if sessionState != .idle { captureService.cancelActiveSession() }
         if editors.contains(where: { $0.document.hasUnsavedMarks }) {
             let alert = NSAlert(); alert.messageText = "退出拾影？"; alert.informativeText = "尚未保存的标注将丢失。"
             alert.addButton(withTitle: "取消"); alert.addButton(withTitle: "退出")
@@ -78,7 +105,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         let main = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于拾影", action: #selector(about), keyEquivalent: "")
-        appMenu.addItem(withTitle: "设置…", action: #selector(showSettings), keyEquivalent: ",")
+        appMenu.addItem(withTitle: "设置…", action: #selector(showSettingsWindow), keyEquivalent: ",")
         appMenu.addItem(withTitle: "打开工作台", action: #selector(showHome), keyEquivalent: "1")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "隐藏拾影", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -229,6 +256,14 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         startCapture { try await self.captureService.region(selectFullScreen: mode == .full) }
     }
 
+    /// Local acceptance path that reuses the production overlay without needing
+    /// screen-recording permission.
+    private func captureSynthetic() {
+        guard sessionState == .idle else { return }
+        guard let image = SyntheticSnapshot.make() else { return }
+        startCapture { try await self.captureService.syntheticCapture(image: image) }
+    }
+
     private func captureLastRegion() {
         guard sessionState == .idle else { return }
         guard let last = settings.settings.lastRegion else {
@@ -241,6 +276,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     }
 
     private func startCapture(_ operation: @escaping () async throws -> CaptureOutcome) {
+        OverlayDiag.log("startCapture state=\(sessionState) frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
         sessionState = .preparing
         busy = true
         let previousFrontmost = NSWorkspace.shared.frontmostApplication
@@ -249,13 +285,15 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         Task {
             defer { sessionState = .idle; busy = false; permission = CGPreflightScreenCaptureAccess() }
             do {
+                DebugLog.write("startCapture: sleeping")
                 try await Task.sleep(nanoseconds: 200_000_000)
                 sessionState = .selecting
                 let outcome = try await operation()
+                DebugLog.write("startCapture: outcome \(outcome)")
                 handleCapture(outcome, restoring: visible, previousFrontmost: previousFrontmost)
             } catch {
-                visible.forEach { $0.orderFront(nil) }
-                restoreFrontmost(previousFrontmost)
+                DebugLog.write("startCapture error: \(error)")
+                restoreAfterSession(visible: visible, previousFrontmost: previousFrontmost)
                 showError(error)
             }
         }
@@ -264,21 +302,29 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
     private func handleCapture(_ outcome: CaptureOutcome, restoring visible: [NSWindow], previousFrontmost: NSRunningApplication?) {
         switch outcome {
         case .cancelled:
-            visible.forEach { $0.orderFront(nil) }
-            restoreFrontmost(previousFrontmost)
+            restoreAfterSession(visible: visible, previousFrontmost: previousFrontmost)
         case .finished(let lastRegion):
             if let lastRegion { settings.settings.lastRegion = lastRegion }
-            restoreFrontmost(previousFrontmost)
+            restoreAfterSession(visible: visible, previousFrontmost: previousFrontmost)
         case .pinned(let image, let name, let lastRegion):
             if let lastRegion { settings.settings.lastRegion = lastRegion }
             pin(image, name: name)
-            restoreFrontmost(previousFrontmost)
+            restoreAfterSession(visible: visible, previousFrontmost: previousFrontmost)
         }
     }
 
-    private func restoreFrontmost(_ app: NSRunningApplication?) {
-        guard let app, app.processIdentifier != ProcessInfo.processInfo.processIdentifier, !app.isTerminated else { return }
-        app.activate(options: [.activateIgnoringOtherApps])
+    /// Restores the pre-capture window visibility and frontmost app. Windows that
+    /// were visible before the capture come back in the same state; a capture
+    /// never forces the workbench open, and focus returns to the app the user was
+    /// using before.
+    private func restoreAfterSession(visible: [NSWindow], previousFrontmost: NSRunningApplication?) {
+        visible.forEach { $0.orderFront(nil) }
+        let selfPID = ProcessInfo.processInfo.processIdentifier
+        if let app = previousFrontmost, app.processIdentifier == selfPID {
+            NSApp.activate(ignoringOtherApps: true)
+        } else if let app = previousFrontmost, !app.isTerminated {
+            app.activate()
+        }
     }
 
     // MARK: Window / picker
@@ -309,21 +355,23 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         if home == nil {
             let window = makeWindow(title: "拾影 · Framelet", size: CGSize(width: 960, height: 660))
             window.minSize = CGSize(width: 900, height: 640)
-            window.contentView = NSHostingView(rootView: HomeView(controller: self))
+            window.contentView = NSHostingView(rootView: HomeView(controller: self, settings: settings))
             home = window
         }
         home?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc func showSettings() {
+    @objc private func showSettingsWindow() { showSettings(tab: 0) }
+
+    @objc func showSettings() { showSettings(tab: 0) }
+
+    func showSettings(tab: Int) {
         permission = CGPreflightScreenCaptureAccess()
-        if settingsWindow == nil {
-            let window = makeWindow(title: "拾影设置", size: CGSize(width: 760, height: 560))
-            window.minSize = CGSize(width: 700, height: 520)
-            window.contentView = NSHostingView(rootView: SettingsView(controller: self, settings: settings, keys: keys))
-            settingsWindow = window
-        }
-        settingsWindow?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        let window = settingsWindow ?? makeWindow(title: "拾影设置", size: CGSize(width: 760, height: 620))
+        window.minSize = CGSize(width: 700, height: 560)
+        window.contentView = NSHostingView(rootView: SettingsView(controller: self, settings: settings, keys: keys, initialTab: tab))
+        settingsWindow = window
+        window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
 
     func openPermissionSettings() {

@@ -139,6 +139,40 @@ public enum Imaging {
         return output
     }
 
+    /// Composites an independently captured window image into a frozen desktop
+    /// snapshot at `viewRect` (view points, local to `viewBounds`). Window
+    /// captures are occlusion-independent, so this is what makes a window shot
+    /// show the window itself rather than whatever desktop pixels were on top.
+    /// The window image is drawn into the exact pixel rect of the window frame,
+    /// so export matches the selection without a second scaling path.
+    public static func compositeWindow(_ windowImage: CGImage, into base: CGImage,
+                                       viewRect: CGRect, viewBounds: CGRect,
+                                       imageSize: CGSize) throws -> CGImage {
+        guard base.width > 0, base.height > 0 else { throw ImagingError.render }
+        let pixel = CaptureGeometry.pixelRect(viewRect, viewBounds: viewBounds, imageSize: imageSize)
+            .intersection(CGRect(x: 0, y: 0, width: imageSize.width, height: imageSize.height))
+        guard !pixel.isNull, pixel.width >= 1, pixel.height >= 1 else { throw ImagingError.render }
+        guard let ctx = context(width: base.width, height: base.height) else { throw ImagingError.render }
+        ctx.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
+        // Marks/pixels use a bottom-left origin; CGContext.draw is already
+        // bottom-left, so only the rect needs to be expressed in that space.
+        ctx.interpolationQuality = .high
+        ctx.draw(windowImage, in: pixel)
+        guard let output = ctx.makeImage() else { throw ImagingError.render }
+        return output
+    }
+
+    /// Writes the final image to a pasteboard. Both PNG and TIFF are provided so
+    /// native targets can paste reliably. Encoding happens before
+    /// `clearContents()`, so a failure can never empty the user's clipboard.
+    public static func writePasteboard(_ image: CGImage, to pasteboard: NSPasteboard) throws {
+        let png = try data(image, type: .png)
+        guard let tiff = NSImage(cgImage: image, size: .zero).tiffRepresentation else { throw ImagingError.export }
+        pasteboard.clearContents()
+        guard pasteboard.setData(png, forType: .png) else { throw ImagingError.export }
+        pasteboard.setData(tiff, forType: .tiff)
+    }
+
     private static func draw(_ mark: Mark, on ctx: CGContext, base: CGImage, offset: CGPoint, clip: CGRect) {
         guard let first = mark.points.first, let last = mark.points.last else { return }
         let p1 = CGPoint(x: first.x - offset.x, y: first.y - offset.y)

@@ -5,6 +5,7 @@ import FrameletCore
 
 struct HomeView: View {
     @ObservedObject var controller: AppController
+    @ObservedObject var settings: AppSettingsStore
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
@@ -58,7 +59,7 @@ struct HomeView: View {
     }
 
     private func shortcut(_ action: CaptureAction) -> String? {
-        guard let combo = controller.settings.settings.globalShortcuts[action] ?? nil else { return nil }
+        guard let combo = settings.settings.globalShortcuts[action] ?? nil else { return nil }
         return HotKeyFormat.display(combo)
     }
 
@@ -170,8 +171,17 @@ struct SettingsView: View {
     @ObservedObject var controller: AppController
     @ObservedObject var settings: AppSettingsStore
     let keys: HotKeyRegistry
-    @State private var tab = 0
+    let initialTab: Int
+    @State private var tab: Int
     @State private var toolError: String?
+
+    init(controller: AppController, settings: AppSettingsStore, keys: HotKeyRegistry, initialTab: Int = 0) {
+        self.controller = controller
+        self.settings = settings
+        self.keys = keys
+        self.initialTab = initialTab
+        _tab = State(initialValue: initialTab)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -294,6 +304,10 @@ struct SettingsView: View {
             settings.settings.toolShortcuts[action] = nil
             return
         }
+        guard !combo.hasRequiredModifier, !combo.hasShift else {
+            toolError = "会话工具键请使用单个按键，不要加修饰键。"
+            return
+        }
         let bare = HotKeyCombo(keyCode: combo.keyCode)
         if let conflict = settings.settings.toolShortcuts.first(where: { $0.key != action && $0.value == bare })?.key {
             toolError = "该键已被「\(conflict.title)」使用。"
@@ -345,6 +359,34 @@ enum DemoImage {
         let base = ctx.makeImage()!
         for (text, point, width) in [("拾影 Framelet", CGPoint(x: 240, y: 610), CGFloat(11)), ("截图，留住重点。", CGPoint(x: 240, y: 480), CGFloat(8)), ("LOCAL · NO ACCOUNT · NO SUBSCRIPTION", CGPoint(x: 240, y: 370), CGFloat(4)), ("这是一张示例图片。试试箭头、标注和文字识别。", CGPoint(x: 240, y: 265), CGFloat(5))] {
             Imaging.draw(Mark(tool: .text, points: [point], color: NSColor(calibratedRed: 0.15, green: 0.24, blue: 0.38, alpha: 1), width: width, text: text), on: ctx, base: base)
+        }
+        return ctx.makeImage()
+    }
+}
+
+/// A synthetic desktop used only by the local `--capture synthetic` acceptance
+/// hook. It lets the real overlay/toolbar/canvas be exercised on machines where
+/// screen-recording permission has not been granted.
+enum SyntheticSnapshot {
+    static func make() -> CGImage? {
+        let width = 1600, height = 1000
+        guard let ctx = Imaging.context(width: width, height: height) else { return nil }
+        ctx.setFillColor(NSColor(calibratedRed: 0.91, green: 0.93, blue: 0.97, alpha: 1).cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.setFillColor(NSColor.white.cgColor)
+        ctx.fill(CGRect(x: 120, y: 140, width: 1360, height: 720))
+        ctx.setFillColor(NSColor(calibratedRed: 0.16, green: 0.35, blue: 0.77, alpha: 1).cgColor)
+        ctx.fill(CGRect(x: 120, y: 780, width: 1360, height: 80))
+        guard let base = ctx.makeImage() else { return nil }
+        let lines: [(String, CGPoint, CGFloat, NSColor)] = [
+            ("拾影 · 验收用合成画面", CGPoint(x: 200, y: 700), 34, NSColor(calibratedRed: 0.13, green: 0.19, blue: 0.25, alpha: 1)),
+            ("这张图只用于本地交互验收，不会进入产品。", CGPoint(x: 200, y: 610), 22, .darkGray),
+            ("1  2  3  4  5  6  7  8", CGPoint(x: 200, y: 500), 30, .darkGray),
+            ("拖动八个手柄可调整选区；V 移动；T 贴图；O 提取文字。", CGPoint(x: 200, y: 400), 20, .gray),
+            ("Enter 完成并复制；Cmd+C 只复制；Esc 取消。", CGPoint(x: 200, y: 320), 20, .gray),
+        ]
+        for (text, point, size, color) in lines {
+            Imaging.draw(Mark(tool: .text, points: [point], color: color, width: size / 4, fontSize: size, text: text), on: ctx, base: base)
         }
         return ctx.makeImage()
     }

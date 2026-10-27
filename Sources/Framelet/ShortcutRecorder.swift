@@ -11,6 +11,7 @@ final class ShortcutRecorderView: NSView {
     var onRecordingChanged: ((Bool) -> Void)?
     private var recording = false
     private var tracking: NSTrackingArea?
+    private var resignObserver: NSObjectProtocol?
 
     override var acceptsFirstResponder: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
@@ -28,14 +29,47 @@ final class ShortcutRecorderView: NSView {
     override func becomeFirstResponder() -> Bool {
         recording = true
         onRecordingChanged?(true)
+        observeResignKey()
         needsDisplay = true
         return true
     }
 
     override func resignFirstResponder() -> Bool {
-        if recording { recording = false; onRecordingChanged?(false) }
-        needsDisplay = true
+        stopRecording()
         return true
+    }
+
+    /// Losing the window (clicking another app, closing settings) must always
+    /// end recording so suspended global hot keys come back.
+    private func observeResignKey() {
+        stopObservingResignKey()
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            self?.stopRecording()
+        }
+    }
+
+    private func stopObservingResignKey() {
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        resignObserver = nil
+    }
+
+    private func stopRecording() {
+        stopObservingResignKey()
+        guard recording else { needsDisplay = true; return }
+        recording = false
+        onRecordingChanged?(false)
+        needsDisplay = true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stopRecording() }
+    }
+
+    deinit {
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
     }
 
     override func mouseDown(with event: NSEvent) {
