@@ -147,6 +147,7 @@ struct SettingsView: View {
     let initialTab: Int
     @State private var tab: Int
     @State private var toolError: String?
+    @State private var saveDirectoryError: String?
 
     init(controller: AppController, settings: AppSettingsStore, keys: HotKeyRegistry, initialTab: Int = 0) {
         self.controller = controller
@@ -297,6 +298,7 @@ struct SettingsView: View {
                 Spacer()
                 Button("选择…") { chooseDirectory() }.controlSize(.small)
             }
+            if let saveDirectoryError { Text(saveDirectoryError).font(.caption).foregroundStyle(.orange) }
         }
     }
 
@@ -340,7 +342,12 @@ struct SettingsView: View {
         panel.canCreateDirectories = true
         panel.directoryURL = settings.saveDirectoryURL
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        settings.settings.saveDirectoryPath = url.path
+        do {
+            try settings.selectSaveDirectory(url)
+            saveDirectoryError = nil
+        } catch {
+            saveDirectoryError = "无法记住这个文件夹，请重新选择：\(error.localizedDescription)"
+        }
     }
 }
 
