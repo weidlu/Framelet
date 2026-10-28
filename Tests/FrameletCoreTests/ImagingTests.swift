@@ -38,6 +38,8 @@ import FrameletCore
             ("选区尺寸和圆角控件靠近左上角",cornerControlsLayout),
             ("设置默认值与类型安全",settingsDefaults),
             ("设置往返与坏值修复",settingsRoundTripAndRepair),
+            ("自选保存目录的权限书签与旧设置兼容",saveDirectoryBookmarkRoundTrip),
+            ("无效保存目录书签不会静默写入其他位置",invalidSaveDirectoryBookmark),
             ("全局快捷键合法性",globalShortcutValidation),
             ("Option+A 与零号 A 键持久化",optionAHotKey),
             ("选区到像素坐标映射",cropGeometry),

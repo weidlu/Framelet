@@ -130,6 +130,9 @@ public struct AppSettings: Codable, Equatable {
     public var saveFormat: SaveFormat
     public var jpegQuality: Double
     public var saveDirectoryPath: String
+    /// Persisted access to a directory selected in an open panel; optional for
+    /// existing preferences and for the default Pictures location.
+    public var saveDirectoryBookmark: Data?
     public var globalShortcuts: [CaptureAction: HotKeyCombo?]
     public var toolShortcuts: [ToolKeyAction: HotKeyCombo?]
     public var strokeWidth: Double
@@ -149,6 +152,7 @@ public struct AppSettings: Codable, Equatable {
                 saveFormat: SaveFormat = .png,
                 jpegQuality: Double = 0.92,
                 saveDirectoryPath: String = AppSettings.defaultSaveDirectory,
+                saveDirectoryBookmark: Data? = nil,
                 globalShortcuts: [CaptureAction: HotKeyCombo?] = AppSettings.defaultGlobalShortcuts,
                 toolShortcuts: [ToolKeyAction: HotKeyCombo?] = AppSettings.defaultToolShortcuts,
                 strokeWidth: Double = 5,
@@ -164,6 +168,7 @@ public struct AppSettings: Codable, Equatable {
         self.saveFormat = saveFormat
         self.jpegQuality = jpegQuality
         self.saveDirectoryPath = saveDirectoryPath
+        self.saveDirectoryBookmark = saveDirectoryBookmark
         self.globalShortcuts = globalShortcuts
         self.toolShortcuts = toolShortcuts
         self.strokeWidth = strokeWidth

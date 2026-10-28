@@ -1,0 +1,20 @@
+name: macOS build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  xcode-build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build App Store target without signing
+        run: >-
+          xcodebuild -project Framelet.xcodeproj -scheme Framelet
+          -configuration Release -destination 'platform=macOS'
+          -derivedDataPath "$RUNNER_TEMP/FrameletDerivedData"
+          CODE_SIGNING_ALLOWED=NO build

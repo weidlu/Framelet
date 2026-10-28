@@ -139,10 +139,11 @@ private actor ScrollAssembly {
                 switch action {
                 case .copy: try CaptureExporter.writePasteboard(image)
                 case .save, .saveAndCopy:
-                    let directory = settings.saveDirectoryURL
-                    try CaptureExporter.ensureDirectory(directory)
-                    let url = CaptureExporter.defaultFileURL(directory: directory, format: settings.settings.saveFormat)
-                    try CaptureExporter.writeFile(image, to: url, format: settings.settings.saveFormat, quality: settings.settings.jpegQuality)
+                    try settings.withSaveDirectory { directory in
+                        try CaptureExporter.ensureDirectory(directory)
+                        let url = CaptureExporter.defaultFileURL(directory: directory, format: settings.settings.saveFormat)
+                        try CaptureExporter.writeFile(image, to: url, format: settings.settings.saveFormat, quality: settings.settings.jpegQuality)
+                    }
                     if action == .saveAndCopy || settings.settings.copyOnSave { try CaptureExporter.writePasteboard(image) }
                 case .pin:
                     if settings.settings.copyOnPin { try CaptureExporter.writePasteboard(image) }
