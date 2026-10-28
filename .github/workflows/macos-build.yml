@@ -21,8 +21,8 @@ jobs:
       - name: Verify both architectures and package the unsigned build
         run: |
           app="$RUNNER_TEMP/FrameletDerivedData/Build/Products/Release/Framelet.app"
-          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/Framelet"
-          lipo -verify_arch arm64 x86_64 "$app/Contents/Frameworks/FrameletCore.framework/FrameletCore"
+          lipo "$app/Contents/MacOS/Framelet" -verify_arch arm64 x86_64
+          lipo "$app/Contents/Frameworks/FrameletCore.framework/FrameletCore" -verify_arch arm64 x86_64
           ditto -c -k --sequesterRsrc --keepParent "$app" "$RUNNER_TEMP/Framelet-unsigned.zip"
       - uses: actions/upload-artifact@v7
         with:
