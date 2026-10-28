@@ -20,9 +20,9 @@
   "sizeBytes": 2258180,
   "previousReleases": [
     {
+      "version": "0.3.0",
       "fileName": "Framelet-0.3.0.dmg",
-      "sha256": "9440b90d79eefa8b8ca05740dbf574cc1076691b775c7bdb75b143936f7e71c6",
-      "version": "0.3.0"
+      "sha256": "9440b90d79eefa8b8ca05740dbf574cc1076691b775c7bdb75b143936f7e71c6"
     }
   ]
 }

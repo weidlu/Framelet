@@ -2,6 +2,7 @@
 .swiftpm/
 dist/
 .DS_Store
+.wrangler/
 *.dmg
 *.zip
 *.xcuserstate

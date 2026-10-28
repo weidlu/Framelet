@@ -1,457 +1,216 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>拾影 · Framelet — 像素级选区与连续长截图</title>
-  <meta name="description" content="独立开发的原生 macOS 截图标注工具。支持长十字线与 1px 键盘微调、原位悬浮工具栏、平滑连续滚动长截图高清拼接与本机离线 Apple Vision 文字识别。零云端上传，数据留在本机。">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
-  <link rel="apple-touch-icon" sizes="128x128" href="assets/img/app-icon-128.png">
-  <link rel="stylesheet" href="assets/css/main.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f6f3">
+  <title>拾影 Framelet — 截下重点，然后继续。</title>
+  <meta name="description" content="常驻菜单栏的 macOS 截图与标注工具。框选、标注、复制都在当前画面原地完成；支持像素级放大镜、本机中英文文字识别、连续长截图与贴图。下载拾影预览版。">
+  <link rel="icon" href="assets/favicon.png" type="image/png">
+  <link rel="preload" as="image" href="assets/shots/hero-all.webp" type="image/webp">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
+<svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="i-all" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3m8 0h3a1 1 0 0 1 1 1v3m0 8v3a1 1 0 0 1-1 1h-3m-8 0H5a1 1 0 0 1-1-1v-3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M6 18 18 6M8 6h10v10"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1.5"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 7V5h14v2M12 5v14m-3 0h6"/></symbol>
+  <symbol id="i-mosaic" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M4 4h5v5H4zm11 0h5v5h-5zM9.5 9.5h5v5h-5zM4 15h5v5H4zm11 0h5v5h-5z"/></symbol>
+  <symbol id="i-redact" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19h14"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+  <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/></symbol>
+  <symbol id="i-ocr" viewBox="0 0 24 24"><path d="M3 8V4h4m10 0h4v4M3 16v4h4m10 0h4v-4M8 9h8m-4 0v7"/></symbol>
+  <symbol id="i-long" viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M9 7h6M9 11h6M9 15h3"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v8"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-menubar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8h18M16 6h2"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M6 7h.01M8.5 7h.01"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10m4 0h2M4 17h4m4 0h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 3.8-5.5 7-5.5s5.8 1.9 7 5.5"/></symbol>
+</defs></svg>
 
-  <!-- 顶部导航栏 -->
-  <header class="site-header">
-    <div class="container nav-wrap">
-      <a href="index.html" class="brand-link" aria-label="拾影 Framelet 官网首页">
-        <img src="assets/img/app-icon-128.png" alt="拾影 AppIcon" class="brand-icon" width="32" height="32">
-        <span>拾影 <span style="font-weight: 400; opacity: 0.85;">Framelet</span></span>
-        <span class="brand-badge">0.3.1 预览版</span>
-      </a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#" aria-label="拾影首页"><img src="assets/app-icon.png" width="30" height="30" alt=""><span>拾影</span><span class="brand-en">Framelet</span></a>
+    <nav aria-label="主导航"><a href="#annotate">标注</a><a href="#precision">精准</a><a href="#more">更多功能</a><a href="#privacy">隐私</a><a href="#questions">常见问题</a></nav>
+    <a class="nav-download" href="#download">下载 <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg></a>
+  </div>
+</header>
 
-      <nav aria-label="主导航">
-        <ul class="nav-links">
-          <li><a href="#viewfinder-demo" class="nav-link">交互演示</a></li>
-          <li><a href="#features" class="nav-link">功能特性</a></li>
-          <li><a href="#principles" class="nav-link">产品边界</a></li>
-          <li><a href="releases.html" class="nav-link">版本说明</a></li>
-          <li><a href="privacy.html" class="nav-link">隐私政策</a></li>
-        </ul>
-      </nav>
-
-      <a href="releases.html" class="nav-cta" id="nav-cta-link">
-        <span class="status-dot"></span>
-        <span>下载预览版</span>
-      </a>
+<main id="main">
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap hero-copy">
+    <p class="pill"><span class="pill-dot" aria-hidden="true"></span><span data-version>0.3.1</span> 预览版 · macOS 14+</p>
+    <h1 id="hero-title">截下重点，<span>然后继续。</span></h1>
+    <p class="lede">拾影安静地待在 Mac 菜单栏。按下快捷键，框选、标注、复制都在当前画面原地完成，不必再打开另一个编辑窗口。</p>
+    <div class="actions">
+      <a class="button button-primary" data-download href="downloads/Framelet-0.3.1.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载 Mac 版</span></a>
+      <a class="button button-ghost" href="#annotate">看看怎么用 <svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></a>
     </div>
-  </header>
+    <p class="meta">Apple Silicon 与 Intel <span aria-hidden="true">·</span> <span data-size>2.2 MB</span> <span aria-hidden="true">·</span> 无需账号</p>
+  </div>
 
-  <main>
-    <!-- Hero 首屏区域 -->
-    <section class="hero-section">
-      <div class="container">
-        <div class="hero-header">
-          <div class="meta-pill">
-            <span class="status-dot"></span>
-            <span>macOS 14+ · Universal 2 架构 · 本地离线处理</span>
-          </div>
-
-          <h1 class="hero-title">从一个像素，<br>到一整段长页面。</h1>
-
-          <p class="hero-subtitle">
-            按下快捷键，框选、标注、复制，就在当前画面完成。长截图随着滚动延伸；识别文字、取色和贴图，也都在手边。
-          </p>
-
-          <!-- 动态下载卡片（数据挂钩 release.json） -->
-          <div class="download-card-hero">
-            <div class="download-cta-group">
-              <a id="primary-download-btn" class="btn-primary btn-pending" aria-disabled="true" role="button" tabindex="0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span>下载即将开放 (预览版准备中)</span>
-              </a>
-              <a href="releases.html" class="btn-secondary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                <span>查看版本说明</span>
-              </a>
-            </div>
-            <div class="download-meta-text" id="release-meta-text">
-              <span>适用于 macOS 14.0 (Sonoma) 或更高版本</span>
-              <span>·</span>
-              <span>Universal 2 (Apple Silicon & Intel)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 特色签名交互演示组件：取景视窗 (Live Interactive Demo) -->
-        <div class="viewfinder-section" id="viewfinder-demo">
-          <div class="viewfinder-wrapper">
-            <!-- 视窗顶栏 -->
-            <div class="viewfinder-topbar">
-              <div class="window-dots">
-                <span class="dot red"></span>
-                <span class="dot yellow"></span>
-                <span class="dot green"></span>
-              </div>
-
-              <div class="viewfinder-title-tabs" role="tablist" aria-label="演示视窗模式切换">
-                <button class="tab-btn active" id="tab-mode-crop" role="tab" aria-selected="true" aria-controls="scene-crop">精确框选与取色</button>
-                <button class="tab-btn" id="tab-mode-long" role="tab" aria-selected="false" aria-controls="scene-long">连续长图高清拼接</button>
-              </div>
-
-              <span class="demo-notice-badge">交互示意 · 非真实桌面捕获</span>
-            </div>
-
-            <!-- 演示画布舞台 -->
-            <div class="stage-area" id="demo-stage" tabindex="0" aria-label="拾影交互模拟画布">
-
-              <!-- 模式 A：精确框选、十字光标与取色 -->
-              <div class="scene-cropper" id="scene-crop">
-                <!-- 模拟的桌面卡片背景 -->
-                <div class="mock-desktop-canvas">
-                  <div class="mock-app-card">
-                    <div style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-main);">
-                      体验原生像素级微调
-                    </div>
-                    <div style="font-size: 0.825rem; color: var(--text-secondary); line-height: 1.5;">
-                      移动鼠标观察长十字线与放大镜。<br>
-                      按下并拖拽鼠标划出选区，体验截取后原位弹出的悬浮工具栏。
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 随动长十字参考线 -->
-                <div class="crosshair-h" id="crosshair-h"></div>
-                <div class="crosshair-v" id="crosshair-v"></div>
-
-                <!-- 随动 8x8 放大镜 -->
-                <div class="magnifier-lens" id="magnifier-lens" aria-hidden="true">
-                  <div class="magnifier-grid">
-                    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-                    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-                    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-                    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell center-pixel"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-                    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-                    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-                    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-                  </div>
-                  <div class="magnifier-info">
-                    <div class="magnifier-hex" id="hex-display">#6366F1</div>
-                    <div style="font-size: 0.65rem; color: var(--text-muted);" id="rgb-display">rgb(99, 102, 241)</div>
-                  </div>
-                </div>
-
-                <!-- 模拟框选选区 -->
-                <div class="crop-box" id="crop-box">
-                  <span class="crop-handle handle-tl"></span>
-                  <span class="crop-handle handle-tr"></span>
-                  <span class="crop-handle handle-bl"></span>
-                  <span class="crop-handle handle-br"></span>
-
-                  <!-- 原位悬浮工具栏 -->
-                  <div class="in-situ-toolbar" id="in-situ-toolbar" style="display: none;">
-                    <button class="tool-btn active" data-tool="rect" title="方框标注" aria-label="方框标注">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                    </button>
-                    <button class="tool-btn" data-tool="arrow" title="箭头标注" aria-label="箭头标注">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="9 5 19 5 19 15"/></svg>
-                    </button>
-                    <button class="tool-btn" data-tool="pen" title="画笔" aria-label="自由画笔">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
-                    </button>
-                    <button class="tool-btn" data-tool="text" title="文字标注" aria-label="文字标注">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-                    </button>
-                    <button class="tool-btn" data-tool="mask" title="不透明遮挡 / 脱敏" aria-label="纯色遮挡">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" fill="currentColor"/></svg>
-                    </button>
-                    <button class="tool-btn" data-tool="mosaic" title="马赛克" aria-label="马赛克">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                    </button>
-                    <div class="tool-divider"></div>
-                    <button class="tool-btn action-confirm" id="btn-confirm-crop" title="复制并完成" aria-label="复制并完成">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span>复制</span>
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-
-              <!-- 模式 B：连续滚动长截图拼接模拟 -->
-              <div class="scene-longscroll" id="scene-long">
-                <!-- 模拟原应用/浏览器视口 -->
-                <div class="scroll-source-viewport">
-                  <div class="mock-page-header">
-                    <span>原文档 / 网页视口 (向下滑动滚动)</span>
-                    <span style="color: var(--accent-iris);">连续滚动</span>
-                  </div>
-                  <div class="scroll-track-container">
-                    <span class="fixed-edge-tag">固定页眉保护 · 仅保留首帧</span>
-                    <div class="scroll-inner-doc" id="scroll-inner-doc">
-                      <div class="doc-line" style="width: 70%;"></div>
-                      <div class="doc-line" style="width: 85%;"></div>
-                      <div class="doc-line" style="width: 55%;"></div>
-                      <div class="doc-block">向下滚动 · 长图继续延伸</div>
-                      <div class="doc-line" style="width: 90%;"></div>
-                      <div class="doc-line" style="width: 65%;"></div>
-                      <div class="doc-line" style="width: 80%;"></div>
-                      <div class="doc-block">右侧可随时查看拼接结果</div>
-                      <div class="doc-line" style="width: 75%;"></div>
-                      <div class="doc-line" style="width: 85%;"></div>
-                      <div class="doc-line" style="width: 60%;"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 侧边实时拼接高清预览窗 -->
-                <div class="scroll-stitch-preview">
-                  <div class="preview-header">
-                    <span>侧边长图实时预览</span>
-                    <span style="font-size: 0.72rem; color: var(--accent-emerald);">高清无条纹</span>
-                  </div>
-                  <div class="preview-strip-box">
-                    <div class="preview-canvas-mimic" id="preview-canvas-mimic" style="height: 120px;">
-                      <div style="padding: 8px; font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);">
-                        [Header: Fixed Edge]<br>
-                        ROW 001 - OK<br>
-                        ROW 002 - OK<br>
-                        ROW 003 - OK<br>
-                        ROW 004 - Stitched...
-                      </div>
-                    </div>
-                  </div>
-                  <div class="preview-height-counter" id="preview-height-counter">
-                    拼接分辨率: 1198 × 1688 px (Retina 高清)
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            <!-- 视窗底部按键指引 -->
-            <div class="viewfinder-footer">
-              <div class="kbd-hint-group">
-                <span>坐标: <code id="coord-display" style="font-family: var(--font-mono); color: var(--text-main);">280, 180</code></span>
-                <span>·</span>
-                <span><kbd>方向键</kbd> 1px 微调</span>
-                <span><kbd>Shift + 方向键</kbd> 10px</span>
-                <span><kbd>G</kbd> 查看 HEX</span>
-                <span><kbd>R</kbd> 查看 RGB</span>
-                <span><kbd>Esc</kbd> 取消</span>
-              </div>
-              <div id="copy-toast" style="opacity: 0; transition: all 0.2s ease; color: var(--accent-emerald); font-weight: 500; font-size: 0.8rem;"></div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- 核心功能矩阵 (Features) -->
-    <section class="features-section" id="features">
-      <div class="container">
-        <div class="section-header">
-          <div class="section-eyebrow">原生体验 · 像素级打磨</div>
-          <h2 class="section-title">为专业效率打造的每一处细节</h2>
-          <p class="section-desc">没有臃肿的功能堆叠，专注解决 macOS 用户日常截图、标注与提取文字最核心的精确度与流畅度。</p>
-        </div>
-
-        <div class="feature-grid">
-          <!-- 特性 1 -->
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
-            </div>
-            <h3 class="feature-title">长十字准星与 1px 微调</h3>
-            <p class="feature-body">
-              全屏贯通的长十字参考线与实时像素放大镜。支持通过方向键以 1 原始像素步进微调选区，按 Shift 步进 10 像素；空格键重设起点，Enter 立即选定。
-            </p>
-            <div class="feature-tags">
-              <span class="feature-tag">1px 步进</span>
-              <span class="feature-tag">Retina 坐标精确换算</span>
-              <span class="feature-tag">sRGB 取色</span>
-            </div>
-          </div>
-
-          <!-- 特性 2 -->
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            </div>
-            <h3 class="feature-title">原位工具栏即刻标注</h3>
-            <p class="feature-body">
-              拖拽框选后在选区旁原地呼出悬浮工具栏，内置矩形、椭圆、箭头、自由画笔、文字、马赛克与纯色遮挡工具。选区左上角可调整圆角，PNG 和复制支持透明角。
-            </p>
-            <div class="feature-tags">
-              <span class="feature-tag">原地工具栏</span>
-              <span class="feature-tag">撤销与重做</span>
-              <span class="feature-tag">敏感信息遮挡</span>
-            </div>
-          </div>
-
-          <!-- 特性 3 -->
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>
-            </div>
-            <h3 class="feature-title">连续滚动长截图高清拼接</h3>
-            <p class="feature-body">
-              在页面中向下滚动，右侧预览随之增长。按原始屏幕像素拼接，可暂停、继续；遇到无法匹配的内容会提示调整。
-            </p>
-            <div class="feature-tags">
-              <span class="feature-tag">连续向下滚动</span>
-              <span class="feature-tag">侧边高清预览</span>
-              <span class="feature-tag">固定页头保护</span>
-            </div>
-          </div>
-
-          <!-- 特性 4 -->
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
-            </div>
-            <h3 class="feature-title">本机 Apple Vision 中英文 OCR</h3>
-            <p class="feature-body">
-              调用系统原生 Apple Vision 离线文字识别引擎，选区内的中英文字可直接提取、编辑与复制。所有识别完全在 Mac 本机运算，敏感票据与对话永不上传云端。
-            </p>
-            <div class="feature-tags">
-              <span class="feature-tag">离线 Vision 引擎</span>
-              <span class="feature-tag">中英文识别</span>
-              <span class="feature-tag">零网络依赖</span>
-            </div>
-          </div>
-
-          <!-- 特性 5 -->
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-            <h3 class="feature-title">3 / 5 / 10 秒延时截图与上次选区</h3>
-            <p class="feature-body">
-              应对悬停浮层、右键菜单和复杂的下拉交互场景。提供 3秒、5秒、10秒精准倒计时截图，支持随时取消；并提供“上次区域截图”快速复用截取范围。
-            </p>
-            <div class="feature-tags">
-              <span class="feature-tag">延时倒计时</span>
-              <span class="feature-tag">悬停浮层截取</span>
-              <span class="feature-tag">记忆上次区域</span>
-            </div>
-          </div>
-
-          <!-- 特性 6 -->
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-            </div>
-            <h3 class="feature-title">复制、贴图，随手就能用</h3>
-            <p class="feature-body">
-              复制截图即可粘贴到其他应用，也能将截图置顶作参考。平时安静留在菜单栏，支持登录启动和自定义快捷键。
-            </p>
-            <div class="feature-tags">
-              <span class="feature-tag">TIFF / PNG 剪贴板</span>
-              <span class="feature-tag">基础贴图置顶</span>
-              <span class="feature-tag">开机自启</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 产品边界与诚实原则 (Boundary & Principles) -->
-    <section class="principles-section" id="principles">
-      <div class="container">
-        <div class="principles-grid">
-          <div class="principles-content">
-            <div class="section-eyebrow">诚实透明 · 尊重用户</div>
-            <h3>专心把截图这件事做好</h3>
-            <p>
-              拾影目前是 0.3.1 预览版，适合日常截图、标注和纵向长图。复杂动画、重复图案或快速跳页，可能让长图拼接暂停。
-            </p>
-            <p>
-              截图和文字识别在本机处理。导出图片不保留独立标注图层；分享敏感内容前，请检查遮挡范围是否完整。
-            </p>
-
-          </div>
-
-          <div class="boundary-box">
-            <div class="boundary-header">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-iris);"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span>当前版本说明</span>
-            </div>
-            <ul class="boundary-list">
-              <li class="boundary-item">
-                <span class="boundary-icon-cross">✕</span>
-                <span><strong>没有录屏与声音内录</strong>。</span>
-              </li>
-              <li class="boundary-item">
-                <span class="boundary-icon-cross">✕</span>
-                <span><strong>没有多语言机翻</strong>：可提取中英文文字。</span>
-              </li>
-              <li class="boundary-item">
-                <span class="boundary-icon-cross">✕</span>
-                <span><strong>没有数字步骤序号</strong>：仅提供箭头、矩形、椭圆、画笔、文字与马赛克基础图形。</span>
-              </li>
-              <li class="boundary-item">
-                <span class="boundary-icon-cross">✕</span>
-                <span><strong>长截图需要手动滚动</strong>：支持暂停与继续。</span>
-              </li>
-              <li class="boundary-item">
-                <span class="boundary-icon-cross">✕</span>
-                <span><strong>没有标注对象二次编辑</strong>：导出为普通图片。</span>
-              </li>
-              <li class="boundary-item">
-                <span class="boundary-icon-check">✓</span>
-                <span><strong>零上传、零广告、零第三方遥测</strong>：所有截图标注与 OCR 完全在本机运行。</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 底部行动区 -->
-    <section class="cta-section">
-      <div class="container">
-        <div class="cta-box">
-          <h2>纯粹桌面截图标注体验</h2>
-          <p id="download-status-msg">
-            0.3.1 预览版已开放下载，安装包通过 Apple 公证。
-          </p>
-          <div class="download-cta-group">
-            <a href="releases.html" class="btn-primary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              <span>查看发布说明与公证状态</span>
-            </a>
-            <a href="privacy.html" class="btn-secondary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span>阅读隐私说明</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- 页脚 -->
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-top">
-        <div class="footer-brand">
-          <img src="assets/img/app-icon-128.png" alt="拾影 Logo" width="24" height="24" style="border-radius: 6px;">
-          <span>拾影 · Framelet</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(macOS 14+)</span>
-        </div>
-
-        <ul class="footer-links">
-          <li><a href="index.html">首页</a></li>
-          <li><a href="releases.html">版本说明</a></li>
-          <li><a href="privacy.html">隐私政策</a></li>
-          <li><a href="https://github.com/weidlu/Framelet" target="_blank" rel="noopener noreferrer">GitHub 开源</a></li>
-          <li><a href="https://yinbingshi.com" target="_blank" rel="noopener noreferrer">饮冰工作室</a></li>
-        </ul>
-      </div>
-
-      <div class="footer-bottom">
-        <div>
-          © 2026 拾影 / Framelet. 独立开发并遵循本地优先原则。
-        </div>
-        <div style="color: var(--text-muted); font-size: 0.75rem;">
-          发布目标：<code>framelet.slnt.dev</code> · 本站托管于 Cloudflare 边缘网络
-        </div>
-      </div>
+  <div class="wrap stage" id="demo">
+    <div class="tool-switch" role="group" aria-label="切换标注效果">
+      <button type="button" data-shot="all" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-all"/></svg>全部</button>
+      <button type="button" data-shot="arrow" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg>箭头<kbd>3</kbd></button>
+      <button type="button" data-shot="box" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-box"/></svg>方框<kbd>1</kbd></button>
+      <button type="button" data-shot="text" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-text"/></svg>文字<kbd>6</kbd></button>
+      <button type="button" data-shot="mosaic" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-mosaic"/></svg>马赛克<kbd>5</kbd></button>
+      <button type="button" data-shot="redact" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-redact"/></svg>遮挡<kbd>7</kbd></button>
     </div>
-  </footer>
+    <figure class="screen">
+      <div class="screen-glass">
+        <img class="is-active" data-shot-image="all" src="assets/shots/hero-all.webp" width="2400" height="1500" alt="拾影截图界面：选区内的看板上标注了方框、箭头和文字，下方表格的联系方式被马赛克和遮挡覆盖，选区下方是标注工具栏。">
+        <img data-shot-image="arrow" src="assets/shots/hero-arrow.webp" width="2400" height="1500" alt="" loading="lazy">
+        <img data-shot-image="box" src="assets/shots/hero-box.webp" width="2400" height="1500" alt="" loading="lazy">
+        <img data-shot-image="text" src="assets/shots/hero-text.webp" width="2400" height="1500" alt="" loading="lazy">
+        <img data-shot-image="mosaic" src="assets/shots/hero-mosaic.webp" width="2400" height="1500" alt="" loading="lazy">
+        <img data-shot-image="redact" src="assets/shots/hero-redact.webp" width="2400" height="1500" alt="" loading="lazy">
+      </div>
+    </figure>
+    <div class="stage-caption">
+      <p id="shot-caption" aria-live="polite">一次框选，箭头、方框、文字、马赛克与遮挡可以叠加使用。</p>
+      <p class="provenance">界面截自拾影 0.3.1，画面中的看板与对话为示例内容。</p>
+    </div>
+  </div>
+</section>
 
-  <script src="assets/js/app.js"></script>
+<section class="facts wrap" aria-label="产品特点">
+  <div><svg class="icon" aria-hidden="true"><use href="#i-crop"/></svg><h2>原地完成</h2><p>标注就画在选区上，不弹编辑窗口。</p></div>
+  <div><svg class="icon" aria-hidden="true"><use href="#i-menubar"/></svg><h2>常驻菜单栏</h2><p>默认 <kbd>⌃</kbd><kbd>⌥</kbd><kbd>4</kbd> 随时开始。</p></div>
+  <div><svg class="icon" aria-hidden="true"><use href="#i-ocr"/></svg><h2>本机识别文字</h2><p>Apple Vision，中英文都认得。</p></div>
+  <div><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><h2>无需账号</h2><p>截图不会上传到开发者服务器。</p></div>
+</section>
+
+<section class="split wrap section-space" id="annotate" aria-labelledby="annotate-title">
+  <div class="split-copy reveal">
+    <p class="eyebrow">原地标注</p>
+    <h2 id="annotate-title">工具栏就在<br>选区旁边。</h2>
+    <p>七种标注工具，数字键直接切换。颜色、粗细与字号在第二行调整，选区随时可以拖动或拉伸，已有标注不会被拉变形。</p>
+    <p>按 <kbd>Enter</kbd> 按你的设置完成，默认复制到剪贴板；<kbd>⌘</kbd><kbd>C</kbd> 只复制、保留选区，<kbd>Esc</kbd> 放弃。</p>
+    <ul class="keymap" aria-label="默认工具快捷键">
+      <li><kbd>V</kbd>移动选区</li><li><kbd>1</kbd>方框</li><li><kbd>2</kbd>圆圈</li><li><kbd>3</kbd>箭头</li>
+      <li><kbd>4</kbd>画笔</li><li><kbd>5</kbd>马赛克</li><li><kbd>6</kbd>文字</li><li><kbd>7</kbd>遮挡</li>
+    </ul>
+  </div>
+  <figure class="shot-card reveal"><img src="assets/shots/toolbar.webp" width="1508" height="952" loading="lazy" alt="选区下方的拾影工具栏：移动、方框、圆圈、箭头、画笔、文字、马赛克、遮挡、撤销、更多、保存、取消和蓝色的复制按钮；第二行是颜色、粗细和像素尺寸。"></figure>
+</section>
+
+<section class="precision section-space" id="precision" aria-labelledby="precision-title">
+  <div class="wrap split split-reverse">
+    <div class="split-copy reveal">
+      <p class="eyebrow">像素级瞄准</p>
+      <h2 id="precision-title">对准到<br>每一个像素。</h2>
+      <p>开始截图时，十字准星与放大镜跟着光标走，逐像素显示附近画面，并给出坐标和颜色值。光标停在窗口上，窗口边缘会被识别出来。</p>
+      <dl class="spec-list">
+        <div><dt>单击选窗，拖动框选</dt><dd>不用切换模式，一个手势决定截窗口还是截区域。</dd></div>
+        <div><dt><kbd>G</kbd> / <kbd>R</kbd> 取色</dt><dd>复制当前像素的 HEX 或 RGB 值。</dd></div>
+        <div><dt>键盘微调</dt><dd>瞄准时方向键微调、空格设起点；选定后方向键移动 1px，<kbd>Shift</kbd> 10px，<kbd>Option</kbd> 调整大小。</dd></div>
+      </dl>
+    </div>
+    <figure class="shot-card shot-dark reveal"><img src="assets/shots/loupe.webp" width="756" height="1000" loading="lazy" alt="拾影的瞄准状态：十字准星穿过画面，光标所在的对话窗口被蓝色边框识别，旁边的深色放大镜显示放大后的像素网格、坐标 X 2380 Y 994、颜色 #6E7A79，以及操作提示。"></figure>
+  </div>
+</section>
+
+<section class="more wrap section-space" id="more" aria-labelledby="more-title">
+  <div class="section-heading reveal">
+    <p class="eyebrow">截完之后</p>
+    <h2 id="more-title">几件常做的小事，也顺手。</h2>
+  </div>
+  <div class="bento">
+    <article class="tile tile-wide tile-image reveal">
+      <div class="tile-copy"><h3><svg class="icon" aria-hidden="true"><use href="#i-ocr"/></svg>提取文字</h3><p>选区里的中英文交给 Apple Vision 在本机识别，结果可以先改再复制。截图时按 <kbd>O</kbd>。</p></div>
+      <img src="assets/shots/ocr.webp" width="1520" height="892" loading="lazy" alt="在表格选区上打开的提取文字面板，列出识别出的姓名、邮箱、电话和问题描述，右下角是复制文字按钮。">
+    </article>
+    <article class="tile tile-modes reveal">
+      <div class="tile-copy"><h3><svg class="icon" aria-hidden="true"><use href="#i-window"/></svg>区域、窗口、全屏</h3><p>还可以重复上次的区域，或从菜单栏选择 3、5、10 秒后再截。</p></div>
+      <ul class="mode-list" aria-label="截图方式"><li>区域截图<span><kbd>⌃</kbd><kbd>⌥</kbd><kbd>4</kbd></span></li><li>全屏截图<span><kbd>⌃</kbd><kbd>⌥</kbd><kbd>3</kbd></span></li><li>窗口截图<span>单击窗口</span></li><li>上次区域截图<span>重复上次</span></li><li>延时截图<span>3 / 5 / 10 秒</span></li></ul>
+      <figure class="modes-shot"><img src="assets/shots/countdown.webp" width="480" height="216" loading="lazy" alt="延时截图开始前的倒计时浮窗，显示“3 秒后开始截图”和取消倒计时按钮。"></figure>
+    </article>
+    <article class="tile tile-image reveal">
+      <div class="tile-copy"><h3><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>贴图</h3><p>把截图贴在桌面上作参考，对照着写代码、填表都方便。截图时按 <kbd>T</kbd>。</p></div>
+      <img src="assets/shots/pin.webp" width="1504" height="760" loading="lazy" alt="标题为“贴图 · 区域截图”的浮动窗口，内容是一张带橙色箭头和文字标注的折线图。">
+    </article>
+    <article class="tile tile-wide tile-image reveal">
+      <div class="tile-copy"><h3><svg class="icon" aria-hidden="true"><use href="#i-redact"/></svg>马赛克与遮挡</h3><p>马赛克弱化细节；手机号、账号这类信息，请用不透明的遮挡。</p></div>
+      <img src="assets/shots/privacy.webp" width="1480" height="336" loading="lazy" alt="表格中两行邮箱被马赛克处理，中间一行电话号码被黑色遮挡完整覆盖。">
+    </article>
+    <article class="tile tile-image tile-long reveal">
+      <div class="tile-copy"><h3><svg class="icon" aria-hidden="true"><use href="#i-long"/></svg>连续长截图</h3><p>框好区域后手动向下滚动，边截边看拼接预览，可以暂停、继续。</p><p class="tile-note">复杂动画或重复内容可能影响拼接，长页面可分段截取。</p></div>
+      <img src="assets/shots/scroll.webp" width="780" height="924" loading="lazy" alt="长截图面板：顶部显示拼接结果尺寸 1120 × 4380 px，下方是滚动中的拼接预览，底部是取消、暂停与复制并结束按钮。">
+    </article>
+    <article class="tile tile-wide tile-image tile-settings reveal">
+      <div class="tile-copy"><h3><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>按你的习惯来</h3><p>全局快捷键和工具键都能改。完成动作可选复制、保存文件、保存并复制或贴图，也可以登录时自动启动。</p></div>
+      <img src="assets/shots/settings.webp" width="1720" height="900" loading="lazy" alt="拾影设置窗口的快捷键页：左侧为截图、快捷键、保存、权限与关于四个入口；右侧的全局快捷键列出区域截图 ⌃⌥4、全屏截图 ⌃⌥3、窗口截图与上次区域截图。">
+    </article>
+  </div>
+</section>
+
+<section class="workflow section-space" id="start" aria-labelledby="start-title">
+  <div class="wrap">
+    <div class="section-heading reveal"><p class="eyebrow">如何开始</p><h2 id="start-title">三下，就回到你的工作里。</h2></div>
+    <ol class="steps">
+      <li class="reveal"><span class="step-key"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>4</kbd></span><h3>框住你想留下的</h3><p>拖出选区，或单击直接选中窗口。快捷键可以在设置里改成习惯的组合。</p></li>
+      <li class="reveal"><span class="step-key"><kbd>1</kbd><span>–</span><kbd>7</kbd></span><h3>把重点标给对方看</h3><p>加一个箭头、一句备注，或者遮住敏感信息。</p></li>
+      <li class="reveal"><span class="step-key"><kbd>Enter</kbd></span><h3>回去直接粘贴</h3><p>默认复制到剪贴板。也可以保存成文件，或贴在桌面上。</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="privacy wrap section-space" id="privacy" aria-labelledby="privacy-title">
+  <div class="privacy-card reveal">
+    <div class="privacy-head">
+      <span class="privacy-icon" aria-hidden="true"><svg class="icon"><use href="#i-lock"/></svg></span>
+      <p class="eyebrow">隐私</p>
+      <h2 id="privacy-title">你的屏幕，留在你的 Mac。</h2>
+    </div>
+    <ul class="privacy-points">
+      <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><div><h3>只在截图时读取屏幕</h3><p>“屏幕录制”是 macOS 对读取屏幕的统一权限名，拾影不会因此持续录屏。</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><div><h3>识别在本机完成</h3><p>截图、标注与文字识别都在本机处理，不上传到开发者服务器。</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><div><h3>不用注册，不自动保存</h3><p>没有账号体系；截图不会自动上传，也不会自动存盘。</p></div></li>
+    </ul>
+    <a class="text-link" href="privacy.html">完整的隐私与权限说明 <svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></a>
+  </div>
+</section>
+
+<section class="questions wrap section-space" id="questions" aria-labelledby="questions-title">
+  <div class="section-heading reveal"><p class="eyebrow">常见问题</p><h2 id="questions-title">下载前，你可能想知道。</h2></div>
+  <div class="faq-list">
+    <details><summary>我的 Mac 可以用吗？<span aria-hidden="true"></span></summary><p>拾影支持 macOS 14（Sonoma）及更高版本。当前安装包为 Universal 2，同时支持 Apple Silicon 和 Intel Mac。Windows 与 iPhone 暂不支持。</p></details>
+    <details><summary>下载后怎么安装？<span aria-hidden="true"></span></summary><p>打开 DMG，将拾影拖入 Applications（应用程序），再从应用程序文件夹打开。第一次截图时，按系统提示开启屏幕录制权限；如系统提示需要重新启动应用，请退出后再打开。</p></details>
+    <details id="privacy-question"><summary>为什么截图工具需要“屏幕录制”权限？<span aria-hidden="true"></span></summary><p>这是 macOS 对读取屏幕画面的统一权限名称。拾影通过它获取截图，并不因此持续录屏。你可以随时在“系统设置 → 隐私与安全性 → 屏幕录制”撤销权限。</p><p>应用不收集截图、识别文字或使用记录。复制内容进入系统剪贴板后，由 macOS 及你使用的其他应用管理。网站托管服务可能处理基础访问日志。</p></details>
+    <details><summary>现在是正式版吗？<span aria-hidden="true"></span></summary><p>当前是 0.3.1 预览版。支持日常截图、标注、中英文文字识别、贴图与纵向连续长图。复杂动画或重复内容可能影响长图拼接；目前不提供录屏和翻译，导出图片不保留独立标注图层。</p></details>
+    <details><summary>马赛克和遮挡，该用哪一个？<span aria-hidden="true"></span></summary><p>马赛克把画面变成像素块，适合弱化不重要的内容。处理姓名、账号等敏感信息，请使用不透明“遮挡”，并在分享前确认覆盖完整。</p></details>
+  </div>
+</section>
+
+<section class="download-section" id="download" aria-labelledby="download-title">
+  <div class="wrap download-inner reveal">
+    <img src="assets/app-icon.png" alt="拾影应用图标" width="96" height="96" loading="lazy">
+    <h2 id="download-title">下一张截图，交给拾影。</h2>
+    <p class="lede">打开 DMG，拖进“应用程序”即可。</p>
+    <a class="button button-primary button-large" data-download href="downloads/Framelet-0.3.1.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载 Mac 版</span></a>
+    <p class="meta"><span data-version>0.3.1</span> 预览版 <span aria-hidden="true">·</span> <span data-size>2.2 MB</span> <span aria-hidden="true">·</span> macOS 14+</p>
+    <p id="release-status" class="release-status" role="status">同时适配 Apple Silicon 与 Intel Mac</p>
+    <button class="text-button" id="release-info" type="button">版本信息与文件校验</button>
+  </div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <a class="brand" href="#"><img src="assets/app-icon.png" alt="" width="24" height="24"><span>拾影</span><span class="brand-en">Framelet</span></a>
+    <nav aria-label="页脚"><a href="privacy.html">隐私与权限</a><a href="releases.html">版本日志</a><a href="#questions">使用帮助</a></nav>
+    <span class="copyright">© 2026 拾影</span>
+  </div>
+</footer>
+
+<dialog id="release-dialog" aria-labelledby="release-dialog-title"><div class="dialog-heading"><h2 id="release-dialog-title">拾影 <span data-version>0.3.1</span> 预览版</h2><form method="dialog"><button aria-label="关闭版本信息">×</button></form></div><p>macOS 14+ · Universal 2 · <span data-size>2.2 MB</span></p><p>首次运行请按系统提示允许屏幕录制。安装与更新时，先退出已运行的拾影，再打开应用程序里的版本。</p><label for="checksum">安装包 SHA-256</label><textarea id="checksum" readonly rows="3" spellcheck="false">9853d97e5fa6d71f003a63c1c5b93fa6e1b5094edfaa728a3984ae344d1242b0</textarea><p class="checksum-help">可在终端运行 <code>shasum -a 256</code>，再拖入 DMG 文件，与这里的值比较。完整改动见 <a href="releases.html">版本日志</a>。</p><a class="button button-primary" data-download href="downloads/Framelet-0.3.1.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载安装包</span></a></dialog>
 </body>
 </html>
