@@ -12,6 +12,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
+      - name: Verify App Store icon matches current artwork
+        run: python3 scripts/check-icon-assets.py
       - name: Build App Store target without signing
         run: >-
           xcodebuild -project Framelet.xcodeproj -scheme Framelet

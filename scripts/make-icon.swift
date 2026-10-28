@@ -91,6 +91,16 @@ for (size, name) in sizes {
     try render(size: size).write(to: iconset.appendingPathComponent(name + ".png"))
 }
 try render(size: 1024).write(to: root.appendingPathComponent("AppIcon.png"))
+// Xcode compiles this catalog for App Store builds. Keep it in sync with the
+// ICNS artwork so refreshing the direct-download icon cannot leave it stale.
+let appIconCatalog = root.appendingPathComponent("Assets.xcassets/AppIcon.appiconset")
+if FileManager.default.fileExists(atPath: appIconCatalog.path) {
+    for (_, name) in sizes {
+        let filename = name + ".png"
+        try Data(contentsOf: iconset.appendingPathComponent(filename))
+            .write(to: appIconCatalog.appendingPathComponent(filename))
+    }
+}
 print("图标源图与全部尺寸已生成：\(root.path)")
 
 // ICNS stores the PNG representations in length-prefixed chunks. Writing the
