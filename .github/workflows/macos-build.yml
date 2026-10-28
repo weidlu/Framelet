@@ -11,10 +11,21 @@ jobs:
   xcode-build:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build App Store target without signing
         run: >-
           xcodebuild -project Framelet.xcodeproj -scheme Framelet
           -configuration Release -destination 'platform=macOS'
           -derivedDataPath "$RUNNER_TEMP/FrameletDerivedData"
-          CODE_SIGNING_ALLOWED=NO build
+          ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
+      - name: Verify both architectures and package the unsigned build
+        run: |
+          app="$RUNNER_TEMP/FrameletDerivedData/Build/Products/Release/Framelet.app"
+          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/Framelet"
+          lipo -verify_arch arm64 x86_64 "$app/Contents/Frameworks/FrameletCore.framework/FrameletCore"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$RUNNER_TEMP/Framelet-unsigned.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Framelet-unsigned-macOS-universal
+          path: ${{ runner.temp }}/Framelet-unsigned.zip
+          retention-days: 3

@@ -182,8 +182,10 @@ public struct AppSettings: Codable, Equatable {
 
     public static var defaultSaveDirectory: String {
         let pictures = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
-        let base = pictures?.path ?? NSHomeDirectory()
-        return (base as NSString).appendingPathComponent("Framelet")
+        let base = pictures ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        // Sandboxed apps see a Pictures symlink in their container. Resolve it
+        // so the location shown in settings remains the user's real folder.
+        return base.resolvingSymlinksInPath().appendingPathComponent("Framelet", isDirectory: true).path
     }
 
     public static let defaultGlobalShortcuts: [CaptureAction: HotKeyCombo?] = [
