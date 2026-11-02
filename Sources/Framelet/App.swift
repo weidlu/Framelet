@@ -120,6 +120,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         let appItem = NSMenuItem(); let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于拾影", action: #selector(about), keyEquivalent: "")
         appMenu.addItem(withTitle: "设置…", action: #selector(showSettingsWindow), keyEquivalent: ",")
+        appMenu.addItem(withTitle: "查看截图错误记录…", action: #selector(showCaptureErrors), keyEquivalent: "")
         appMenu.addItem(withTitle: "打开截图面板", action: #selector(showHome), keyEquivalent: "1")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "隐藏拾影", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -185,11 +186,14 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         addDelayedCaptureMenu(to: menu)
         menu.addItem(.separator())
         menu.addItem(withTitle: "设置…", action: #selector(showSettingsWindow), keyEquivalent: ",").target = self
+        menu.addItem(withTitle: "查看截图错误记录…", action: #selector(showCaptureErrors), keyEquivalent: "").target = self
         menu.addItem(withTitle: "打开拾影", action: #selector(showHome), keyEquivalent: "").target = self
         let quit = menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         return menu
     }
+
+    @objc private func showCaptureErrors() { CaptureRecoveryLog.reveal() }
 
     private func addDelayedCaptureMenu(to menu: NSMenu) {
         let parent = NSMenuItem(title: "延时截图", action: nil, keyEquivalent: "")
@@ -319,7 +323,10 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
         let visible = (windowsToHide ?? [home, picker].compactMap { $0 }).filter { $0.isVisible }
         visible.forEach { $0.orderOut(nil) }
         Task {
-            defer { sessionState = .idle; busy = false; permission = CGPreflightScreenCaptureAccess() }
+            defer {
+                sessionState = .idle; busy = false; permission = CGPreflightScreenCaptureAccess()
+                CaptureRecoveryLog.showPendingNotice()
+            }
             do {
                 DebugLog.write("startCapture: sleeping")
                 try await Task.sleep(nanoseconds: 200_000_000)

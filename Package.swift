@@ -7,7 +7,8 @@ let package = Package(
     products: [.executable(name: "Framelet", targets: ["Framelet"])],
     targets: [
         .target(name: "FrameletCore"),
-        .executableTarget(name: "Framelet", dependencies: ["FrameletCore"]),
+        .target(name: "CaptureTextRenderer", cSettings: [.unsafeFlags(["-fobjc-arc"])]),
+        .executableTarget(name: "Framelet", dependencies: ["FrameletCore", "CaptureTextRenderer"]),
         .executableTarget(name: "FrameletChecks", dependencies: ["FrameletCore"], path: "Tests/FrameletCoreTests", resources: [.copy("Fixtures")])
     ],
     swiftLanguageModes: [.v5]

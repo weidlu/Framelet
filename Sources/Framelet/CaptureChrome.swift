@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import FrameletCore
+import CaptureTextRenderer
 
 enum CaptureSelectionOutline {
     static func path(in rect: CGRect, cornerRadius: CGFloat, pixelScale: CGFloat = 1) -> NSBezierPath {
@@ -39,17 +40,14 @@ final class CaptureSelectionChrome: NSView {
                 NSColor.systemBlue.setStroke(); handle.lineWidth = 1.5; handle.stroke()
             }
         }
-        guard showLabel else { return }
-        let label = NSAttributedString(string: "\(Int(pixelSize.width.rounded())) × \(Int(pixelSize.height.rounded()))", attributes: [
-            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.white
-        ])
-        let size = label.size()
-        let x = min(max(10, selection.minX + 6), max(10, bounds.maxX - size.width - 18))
-        let proposedY = selection.maxY + 10
-        let y = proposedY + size.height + 8 <= bounds.maxY ? proposedY : max(10, selection.maxY - size.height - 12)
-        NSColor.black.withAlphaComponent(0.85).setFill()
-        NSBezierPath(roundedRect: CGRect(x: x - 6, y: y - 4, width: size.width + 12, height: size.height + 8), xRadius: 5, yRadius: 5).fill()
-        label.draw(at: CGPoint(x: x, y: y))
+        guard showLabel, !CaptureRecoveryLog.labelDisabled else { return }
+        guard pixelSize.width.isFinite, pixelSize.height.isFinite,
+              pixelSize.width >= 0, pixelSize.height >= 0 else { return }
+        var error: NSError?
+        if !FLDrawCaptureDimensions(pixelSize, selection, bounds, &error) {
+            // Fail closed for this optional decoration, never for the capture.
+            CaptureRecoveryLog.disableLabel(error)
+        }
     }
 }
 

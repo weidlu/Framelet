@@ -29,6 +29,7 @@
 
 ```sh
 bash scripts/swift.sh run FrameletChecks
+bash scripts/check-capture-label.sh
 bash scripts/build.sh
 open dist/Framelet.app
 ```
@@ -50,3 +51,7 @@ UNIVERSAL=1 bash scripts/build.sh
 ## 许可证
 
 源代码采用 [MIT License](LICENSE)。
+
+### 截图错误记录
+
+尺寸提示出现字体绘制异常时，会暂时隐藏尺寸标签，保留选区操作；截图结束后显示一次提示。菜单栏的“查看截图错误记录…”可在 Finder 中定位本机错误日志。记录包含版本、系统、字体、失败阶段及异常堆栈，不包含截图内容。正常截图不会写入该错误日志。
