@@ -1,0 +1,4 @@
+module CaptureTextRenderer {
+    header "CaptureTextRenderer.h"
+    export *
+}
