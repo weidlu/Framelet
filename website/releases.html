@@ -31,7 +31,7 @@
   <header class="policy-head">
     <p class="eyebrow">版本</p>
     <h1>版本日志</h1>
-    <p class="policy-meta">当前版本 <span data-version>0.3.1</span> 预览版 · 2026 年 10 月 28 日</p>
+    <p class="policy-meta">当前版本 <span data-version>0.3.2</span> 预览版 · 2026 年 11 月 2 日</p>
   </header>
 
   <div class="policy-lede">
@@ -39,6 +39,13 @@
   </div>
 
   <article class="policy-body">
+    <h2>0.3.2 预览版 · 2026-11-02</h2>
+    <ul>
+      <li>针对拖动截图选区时尺寸文字绘制异常导致的闪退增加局部保护，并改用具名字体。</li>
+      <li>若尺寸提示再次出现同类异常，会临时隐藏出错的提示，保留选区和后续截图操作；截图结束后显示一次说明。</li>
+      <li>菜单新增“查看截图错误记录…”入口，便于提供本机错误信息；记录不包含截图内容。</li>
+    </ul>
+
     <h2>0.3.1 预览版 · 2026-10-28</h2>
     <ul>
       <li>选区左上角新增圆角滑块，可在直角与常用圆角之间调整，并记住上次设置。</li>
@@ -75,7 +82,7 @@
 
     <h2>校验安装包</h2>
     <p>在终端执行下面的命令，与首页「版本信息与文件校验」里的 SHA-256 对比：</p>
-    <p><code>shasum -a 256 Framelet-0.3.1.dmg</code></p>
+    <p><code>shasum -a 256 Framelet-0.3.2.dmg</code></p>
     <p>要确认签名与公证票据状态，可以执行：</p>
     <p><code>spctl --assess --type execute --verbose=2 /Applications/Framelet.app</code></p>
   </article>

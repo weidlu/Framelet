@@ -45,14 +45,14 @@
 <main id="main">
 <section class="hero" aria-labelledby="hero-title">
   <div class="wrap hero-copy">
-    <p class="pill"><span class="pill-dot" aria-hidden="true"></span><span data-version>0.3.1</span> 预览版 · macOS 14+</p>
+    <p class="pill"><span class="pill-dot" aria-hidden="true"></span><span data-version>0.3.2</span> 预览版 · macOS 14+</p>
     <h1 id="hero-title">截下重点，<span>然后继续。</span></h1>
     <p class="lede">拾影安静地待在 Mac 菜单栏。按下快捷键，框选、标注、复制都在当前画面原地完成，不必再打开另一个编辑窗口。</p>
     <div class="actions">
-      <a class="button button-primary" data-download href="downloads/Framelet-0.3.1.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载 Mac 版</span></a>
+      <a class="button button-primary" data-download href="downloads/Framelet-0.3.2.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载 Mac 版</span></a>
       <a class="button button-ghost" href="#annotate">看看怎么用 <svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></a>
     </div>
-    <p class="meta">Apple Silicon 与 Intel <span aria-hidden="true">·</span> <span data-size>2.2 MB</span> <span aria-hidden="true">·</span> 无需账号</p>
+    <p class="meta">Apple Silicon 与 Intel <span aria-hidden="true">·</span> <span data-size>2.3 MB</span> <span aria-hidden="true">·</span> 无需账号</p>
   </div>
 
   <div class="wrap stage" id="demo">
@@ -185,7 +185,7 @@
     <details><summary>我的 Mac 可以用吗？<span aria-hidden="true"></span></summary><p>拾影支持 macOS 14（Sonoma）及更高版本。当前安装包为 Universal 2，同时支持 Apple Silicon 和 Intel Mac。Windows 与 iPhone 暂不支持。</p></details>
     <details><summary>下载后怎么安装？<span aria-hidden="true"></span></summary><p>打开 DMG，将拾影拖入 Applications（应用程序），再从应用程序文件夹打开。第一次截图时，按系统提示开启屏幕录制权限；如系统提示需要重新启动应用，请退出后再打开。</p></details>
     <details id="privacy-question"><summary>为什么截图工具需要“屏幕录制”权限？<span aria-hidden="true"></span></summary><p>这是 macOS 对读取屏幕画面的统一权限名称。拾影通过它获取截图，并不因此持续录屏。你可以随时在“系统设置 → 隐私与安全性 → 屏幕录制”撤销权限。</p><p>应用不收集截图、识别文字或使用记录。复制内容进入系统剪贴板后，由 macOS 及你使用的其他应用管理。网站托管服务可能处理基础访问日志。</p></details>
-    <details><summary>现在是正式版吗？<span aria-hidden="true"></span></summary><p>当前是 0.3.1 预览版。支持日常截图、标注、中英文文字识别、贴图与纵向连续长图。复杂动画或重复内容可能影响长图拼接；目前不提供录屏和翻译，导出图片不保留独立标注图层。</p></details>
+    <details><summary>现在是正式版吗？<span aria-hidden="true"></span></summary><p>当前是 0.3.2 预览版。支持日常截图、标注、中英文文字识别、贴图与纵向连续长图。复杂动画或重复内容可能影响长图拼接；目前不提供录屏和翻译，导出图片不保留独立标注图层。</p></details>
     <details><summary>马赛克和遮挡，该用哪一个？<span aria-hidden="true"></span></summary><p>马赛克把画面变成像素块，适合弱化不重要的内容。处理姓名、账号等敏感信息，请使用不透明“遮挡”，并在分享前确认覆盖完整。</p></details>
   </div>
 </section>
@@ -195,8 +195,8 @@
     <img src="assets/app-icon.png" alt="拾影应用图标" width="96" height="96" loading="lazy">
     <h2 id="download-title">下一张截图，交给拾影。</h2>
     <p class="lede">打开 DMG，拖进“应用程序”即可。</p>
-    <a class="button button-primary button-large" data-download href="downloads/Framelet-0.3.1.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载 Mac 版</span></a>
-    <p class="meta"><span data-version>0.3.1</span> 预览版 <span aria-hidden="true">·</span> <span data-size>2.2 MB</span> <span aria-hidden="true">·</span> macOS 14+</p>
+    <a class="button button-primary button-large" data-download href="downloads/Framelet-0.3.2.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载 Mac 版</span></a>
+    <p class="meta"><span data-version>0.3.2</span> 预览版 <span aria-hidden="true">·</span> <span data-size>2.3 MB</span> <span aria-hidden="true">·</span> macOS 14+</p>
     <p id="release-status" class="release-status" role="status">同时适配 Apple Silicon 与 Intel Mac</p>
     <button class="text-button" id="release-info" type="button">版本信息与文件校验</button>
   </div>
@@ -211,6 +211,6 @@
   </div>
 </footer>
 
-<dialog id="release-dialog" aria-labelledby="release-dialog-title"><div class="dialog-heading"><h2 id="release-dialog-title">拾影 <span data-version>0.3.1</span> 预览版</h2><form method="dialog"><button aria-label="关闭版本信息">×</button></form></div><p>macOS 14+ · Universal 2 · <span data-size>2.2 MB</span></p><p>首次运行请按系统提示允许屏幕录制。安装与更新时，先退出已运行的拾影，再打开应用程序里的版本。</p><label for="checksum">安装包 SHA-256</label><textarea id="checksum" readonly rows="3" spellcheck="false">9853d97e5fa6d71f003a63c1c5b93fa6e1b5094edfaa728a3984ae344d1242b0</textarea><p class="checksum-help">可在终端运行 <code>shasum -a 256</code>，再拖入 DMG 文件，与这里的值比较。完整改动见 <a href="releases.html">版本日志</a>。</p><a class="button button-primary" data-download href="downloads/Framelet-0.3.1.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载安装包</span></a></dialog>
+<dialog id="release-dialog" aria-labelledby="release-dialog-title"><div class="dialog-heading"><h2 id="release-dialog-title">拾影 <span data-version>0.3.2</span> 预览版</h2><form method="dialog"><button aria-label="关闭版本信息">×</button></form></div><p>macOS 14+ · Universal 2 · <span data-size>2.3 MB</span></p><p>首次运行请按系统提示允许屏幕录制。安装与更新时，先退出已运行的拾影，再打开应用程序里的版本。</p><label for="checksum">安装包 SHA-256</label><textarea id="checksum" readonly rows="3" spellcheck="false">6cbd1d6e7059622a176296037e40dd32edcaeba8687f759393df1333f56e0d7b</textarea><p class="checksum-help">可在终端运行 <code>shasum -a 256</code>，再拖入 DMG 文件，与这里的值比较。完整改动见 <a href="releases.html">版本日志</a>。</p><a class="button button-primary" data-download href="downloads/Framelet-0.3.2.dmg" download><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>下载安装包</span></a></dialog>
 </body>
 </html>
