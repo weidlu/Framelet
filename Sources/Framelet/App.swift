@@ -69,6 +69,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
             UserDefaults.standard.set(true, forKey: "framelet.menuBarSetupShown")
             showSettings()
         }
+        #if !FRAMELET_APP_STORE
         // Local verification hooks: launch straight into a screen for manual
         // acceptance runs without needing synthetic input events.
         let arguments = ProcessInfo.processInfo.arguments
@@ -92,6 +93,7 @@ enum SessionState: Equatable { case idle, preparing, selecting, editing, committ
            let tab = Int(arguments[index + 1]) {
             showSettings(tab: tab)
         }
+        #endif
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showSettings(); return true }

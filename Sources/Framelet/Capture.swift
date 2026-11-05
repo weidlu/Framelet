@@ -927,12 +927,13 @@ private final class RegionView: NSView {
     }
 
     private func saveToDefaultDirectory(_ image: CGImage) throws -> URL {
-        let directory = settings.saveDirectoryURL
-        try CaptureExporter.ensureDirectory(directory)
-        let url = CaptureExporter.defaultFileURL(directory: directory, format: settings.settings.saveFormat)
-        try CaptureExporter.writeFile(image, to: url, format: settings.settings.saveFormat, quality: settings.settings.jpegQuality)
-        lastSavedURL = directory
-        return url
+        try settings.withSaveDirectory { directory in
+            try CaptureExporter.ensureDirectory(directory)
+            let url = CaptureExporter.defaultFileURL(directory: directory, format: settings.settings.saveFormat)
+            try CaptureExporter.writeFile(image, to: url, format: settings.settings.saveFormat, quality: settings.settings.jpegQuality)
+            lastSavedURL = directory
+            return url
+        }
     }
 
     private func saveFormat(for url: URL) -> SaveFormat {

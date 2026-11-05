@@ -1,0 +1,33 @@
+name: macOS build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  xcode-build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify App Store icon matches current artwork
+        run: python3 scripts/check-icon-assets.py
+      - name: Build App Store target without signing
+        run: >-
+          xcodebuild -project Framelet.xcodeproj -scheme Framelet
+          -configuration Release -destination 'platform=macOS'
+          -derivedDataPath "$RUNNER_TEMP/FrameletDerivedData"
+          ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
+      - name: Verify both architectures and package the unsigned build
+        run: |
+          app="$RUNNER_TEMP/FrameletDerivedData/Build/Products/Release/Framelet.app"
+          lipo "$app/Contents/MacOS/Framelet" -verify_arch arm64 x86_64
+          lipo "$app/Contents/Frameworks/FrameletCore.framework/FrameletCore" -verify_arch arm64 x86_64
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$RUNNER_TEMP/Framelet-unsigned.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Framelet-unsigned-macOS-universal
+          path: ${{ runner.temp }}/Framelet-unsigned.zip
+          retention-days: 3
