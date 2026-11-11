@@ -1,24 +1,34 @@
 {
-  "version": "0.3.1",
+  "version": "0.3.3",
   "channel": "preview",
-  "name": "Framelet 0.3.1 预览版",
-  "releaseDate": "2026-10-28",
+  "name": "Framelet 0.3.3 预览版",
+  "releaseDate": "2026-11-11",
   "minimumOS": "macOS 14.0 (Sonoma) 或更高版本",
   "architecture": "Universal 2 (Apple Silicon M系列 & Intel Mac)",
   "available": true,
   "status": "released",
-  "statusMessage": "0.3.1 预览版已开放下载，安装包通过 Apple 公证。",
-  "fileName": "Framelet-0.3.1.dmg",
-  "url": "/downloads/Framelet-0.3.1.dmg",
-  "sha256": "9853d97e5fa6d71f003a63c1c5b93fa6e1b5094edfaa728a3984ae344d1242b0",
-  "size": "2.2 MB",
+  "statusMessage": "0.3.3 预览版已开放下载，修复像素放大镜文字绘制闪退，安装包通过 Apple 公证。",
+  "fileName": "Framelet-0.3.3.dmg",
+  "url": "/downloads/Framelet-0.3.3.dmg",
+  "sha256": "ff9b5b4e4aced08f0da07fbca9f1cd91af917e6a2a1239f58f0d44b8edfc3046",
+  "size": "2.3 MB",
   "notarized": true,
   "signingIdentity": "Developer ID Application",
   "downloadNotice": "需在 macOS「系统设置 - 隐私与安全性」中授予屏幕录制权限，所有截图标注与 OCR 均在本地离线处理。",
   "changelogUrl": "releases.html",
   "signed": true,
-  "sizeBytes": 2258180,
+  "sizeBytes": 2288679,
   "previousReleases": [
+    {
+      "version": "0.3.2",
+      "fileName": "Framelet-0.3.2.dmg",
+      "sha256": "6cbd1d6e7059622a176296037e40dd32edcaeba8687f759393df1333f56e0d7b"
+    },
+    {
+      "version": "0.3.1",
+      "fileName": "Framelet-0.3.1.dmg",
+      "sha256": "9853d97e5fa6d71f003a63c1c5b93fa6e1b5094edfaa728a3984ae344d1242b0"
+    },
     {
       "version": "0.3.0",
       "fileName": "Framelet-0.3.0.dmg",
