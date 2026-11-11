@@ -2,4 +2,5 @@
 NS_ASSUME_NONNULL_BEGIN
 /// Contains Objective-C exceptions entirely within Objective-C; none unwind Swift frames.
 BOOL FLDrawCaptureDimensions(CGSize pixels, CGRect selection, CGRect bounds, NSError * _Nullable * _Nullable error);
+BOOL FLDrawCaptureLoupeText(CGRect panel, NSString *coordinates, NSString * _Nullable color, NSString *message, NSString *hint, NSError * _Nullable * _Nullable error);
 NS_ASSUME_NONNULL_END

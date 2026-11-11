@@ -1,5 +1,6 @@
 import AppKit
 import FrameletCore
+import CaptureTextRenderer
 
 /// Decorative only: never intercepts selection, toolbar or editor events.
 /// Samples the original image, so dimming, guides and annotations cannot feed
@@ -69,15 +70,14 @@ final class PrecisionCaptureGuide: NSView {
         let center = CGRect(x: grid.minX + 7 * cell, y: grid.minY + 7 * cell, width: cell, height: cell)
         ctx.setStrokeColor(NSColor.black.cgColor); ctx.setLineWidth(3); ctx.stroke(center)
         ctx.setStrokeColor(NSColor.systemYellow.cgColor); ctx.setLineWidth(1); ctx.stroke(center)
+        guard !CaptureRecoveryLog.isDisabled(.loupeText) else { return }
         ctx.setShouldAntialias(true)
-        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white]
-        ("X \(Int(pixel.x))  Y \(Int(pixel.y))" as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 71), withAttributes: attrs)
-        if let color = SampledColor.read(image, pixel: pixel) {
-            (color.hex + "  " + "\(color.red),\(color.green),\(color.blue)" as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 54), withAttributes: attrs)
-        }
-        ((message ?? "G 复制 HEX · R 复制 RGB") as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 39), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.systemYellow])
-        ("方向键微调 · 空格设起点" as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 23), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.white])
+        let color = SampledColor.read(image, pixel: pixel).map { "\($0.hex)  \($0.red),\($0.green),\($0.blue)" }
         let hint = dragging ? "松开选定 · Esc 取消" : "单击选窗 · 拖动框选"
-        (hint as NSString).draw(at: CGPoint(x: panel.minX + 12, y: panel.minY + 7), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor(white: 0.75, alpha: 1)])
+        var error: NSError?
+        if !FLDrawCaptureLoupeText(panel, "X \(Int(pixel.x))  Y \(Int(pixel.y))", color,
+                                 message ?? "G 复制 HEX · R 复制 RGB", hint, &error) {
+            CaptureRecoveryLog.disable(.loupeText, error)
+        }
     }
 }
