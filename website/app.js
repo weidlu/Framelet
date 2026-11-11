@@ -92,7 +92,7 @@ async function updateRelease() {
   } catch {
     // The packaged, verified links remain usable if metadata refresh fails.
     const status = document.querySelector('#release-status');
-    if (status) status.textContent = '当前提供 0.3.2 预览版；如下载失败，请稍后重试。';
+    if (status) status.textContent = '当前提供 0.3.3 预览版；如下载失败，请稍后重试。';
   }
 }
 updateRelease();
