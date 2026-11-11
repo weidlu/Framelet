@@ -40,13 +40,13 @@ final class CaptureSelectionChrome: NSView {
                 NSColor.systemBlue.setStroke(); handle.lineWidth = 1.5; handle.stroke()
             }
         }
-        guard showLabel, !CaptureRecoveryLog.labelDisabled else { return }
+        guard showLabel, !CaptureRecoveryLog.isDisabled(.dimensionLabel) else { return }
         guard pixelSize.width.isFinite, pixelSize.height.isFinite,
               pixelSize.width >= 0, pixelSize.height >= 0 else { return }
         var error: NSError?
         if !FLDrawCaptureDimensions(pixelSize, selection, bounds, &error) {
             // Fail closed for this optional decoration, never for the capture.
-            CaptureRecoveryLog.disableLabel(error)
+            CaptureRecoveryLog.disable(.dimensionLabel, error)
         }
     }
 }

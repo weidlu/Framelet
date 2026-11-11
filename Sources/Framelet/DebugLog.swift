@@ -26,9 +26,14 @@ enum DebugLog {
 }
 
 /// Error-only, bounded log. No pixels, OCR text, window titles or keystrokes.
-/// Disables just the optional dimension label for the rest of this process.
+/// Disables only the affected decoration for the rest of this process.
 enum CaptureRecoveryLog {
-    private(set) static var labelDisabled = false
+    enum Decoration: String {
+        case dimensionLabel = "dimension-label"
+        case loupeText = "loupe-text"
+    }
+    private static var disabled: Set<Decoration> = []
+    static func isDisabled(_ decoration: Decoration) -> Bool { disabled.contains(decoration) }
     private static var noticePending = false
     private(set) static var persistenceError: String?
     private static let logger = Logger(subsystem: "com.framelet.capture", category: "CaptureRecovery")
@@ -37,13 +42,12 @@ enum CaptureRecoveryLog {
             .appendingPathComponent("Logs/Framelet/capture-errors.log")
     }
 
-    static func disableLabel(_ error: NSError?) {
-        guard !labelDisabled else { return }
-        labelDisabled = true
+    static func disable(_ decoration: Decoration, _ error: NSError?) {
+        guard disabled.insert(decoration).inserted else { return }
         noticePending = true
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "development"
-        let message = "[\(Date())] dimension-label-disabled version=\(version) build=\(build) os=\(ProcessInfo.processInfo.operatingSystemVersionString)\n\(error?.description ?? "Unknown text rendering failure")\n"
+        let message = "[\(Date())] \(decoration.rawValue)-disabled version=\(version) build=\(build) os=\(ProcessInfo.processInfo.operatingSystemVersionString)\n\(error?.description ?? "Unknown text rendering failure")\n"
         logger.error("\(message, privacy: .public)")
         do {
             let url = logURL
@@ -64,8 +68,8 @@ enum CaptureRecoveryLog {
         noticePending = false
         DispatchQueue.main.async {
             let alert = NSAlert()
-            alert.messageText = "截图尺寸提示已临时隐藏"
-            alert.informativeText = "显示尺寸文字时出现异常，已关闭本次运行的尺寸提示。选区、标注和保存功能可继续使用。你可以从菜单栏的“查看截图错误记录…”找到报障信息。"
+            alert.messageText = "部分截图文字提示已临时隐藏"
+            alert.informativeText = "绘制截图提示文字时出现异常，本次运行将隐藏受影响的文字。选区、标注和保存功能可继续使用。你可以从菜单栏的“查看截图错误记录…”找到报障信息。"
             alert.addButton(withTitle: "知道了")
             alert.addButton(withTitle: "查看错误记录")
             if alert.runModal() == .alertSecondButtonReturn { reveal() }
@@ -75,8 +79,8 @@ enum CaptureRecoveryLog {
     static func reveal() {
         guard FileManager.default.fileExists(atPath: logURL.path), persistenceError == nil else {
             let alert = NSAlert()
-            alert.messageText = labelDisabled ? "错误记录未能保存" : "尚无截图错误记录"
-            alert.informativeText = persistenceError ?? "尚未记录到尺寸提示异常。若应用直接退出，macOS 崩溃报告位于“控制台”中的崩溃报告列表。"
+            alert.messageText = disabled.isEmpty ? "尚无截图错误记录" : "错误记录未能保存"
+            alert.informativeText = persistenceError ?? "尚未记录到截图提示异常。若应用直接退出，macOS 崩溃报告位于“控制台”中的崩溃报告列表。"
             alert.runModal()
             return
         }
