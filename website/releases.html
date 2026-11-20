@@ -31,7 +31,7 @@
   <header class="policy-head">
     <p class="eyebrow">版本</p>
     <h1>版本日志</h1>
-    <p class="policy-meta">当前版本 <span data-version>0.3.3</span> 预览版 · 2026 年 11 月 11 日</p>
+    <p class="policy-meta">当前版本 <span data-version>0.3.4</span> 预览版 · 2026 年 11 月 20 日</p>
   </header>
 
   <div class="policy-lede">
@@ -39,6 +39,11 @@
   </div>
 
   <article class="policy-body">
+    <h2>0.3.4 预览版 · 2026-11-20</h2>
+    <ul>
+      <li>截图时按一次 Esc 直接退出。即使正在输入标注文字，也会放弃本次截图，不保存、不复制。</li>
+    </ul>
+
     <h2>0.3.3 预览版 · 2026-11-11</h2>
     <ul>
       <li>修复像素放大镜绘制文字时可能导致的闪退。</li>
@@ -88,7 +93,7 @@
 
     <h2>校验安装包</h2>
     <p>在终端执行下面的命令，与首页「版本信息与文件校验」里的 SHA-256 对比：</p>
-    <p><code>shasum -a 256 Framelet-0.3.3.dmg</code></p>
+    <p><code>shasum -a 256 Framelet-0.3.4.dmg</code></p>
     <p>要确认签名与公证票据状态，可以执行：</p>
     <p><code>spctl --assess --type execute --verbose=2 /Applications/Framelet.app</code></p>
   </article>

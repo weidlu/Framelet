@@ -87,12 +87,12 @@ async function updateRelease() {
     if (checksum && /^[a-f0-9]{64}$/i.test(release.sha256 || '')) checksum.value = release.sha256;
     const status = document.querySelector('#release-status');
     if (status) status.textContent = available
-      ? '同时适配 Apple Silicon 与 Intel Mac'
+      ? (release.statusMessage || '同时适配 Apple Silicon 与 Intel Mac')
       : (release.statusMessage || '安装包正在准备中，请稍后再来。');
   } catch {
     // The packaged, verified links remain usable if metadata refresh fails.
     const status = document.querySelector('#release-status');
-    if (status) status.textContent = '当前提供 0.3.3 预览版；如下载失败，请稍后重试。';
+    if (status) status.textContent = '当前提供 0.3.4 预览版；如下载失败，请稍后重试。';
   }
 }
 updateRelease();
