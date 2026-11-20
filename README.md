@@ -4,7 +4,7 @@
 
 [官网与下载](https://framelet.slnt.dev) · [使用说明](docs/使用说明.txt) · [隐私说明](https://framelet.slnt.dev/privacy.html)
 
-当前版本为 **0.3.3 预览版**，支持 macOS 14 及以上的 Apple Silicon 和 Intel Mac。
+当前版本为 **0.3.4 预览版**，支持 macOS 14 及以上的 Apple Silicon 和 Intel Mac。
 
 ## 功能
 
@@ -21,7 +21,7 @@
 
 从[官网](https://framelet.slnt.dev)下载安装，将拾影拖进“应用程序”。首次截图需要按 macOS 提示授予屏幕录制权限。默认快捷键为 `Control+Option+4`（区域）和 `Control+Option+3`（全屏），可在设置中更改。
 
-选区确定后，在左上角尺寸旁调整圆角；在下方工具栏标注，点击完成或按 Enter 执行设置的完成动作。Esc 取消，`Command+C` 复制但保留选区。
+选区确定后，在左上角尺寸旁调整圆角；在下方工具栏标注，点击完成或按 Enter 执行设置的完成动作。按一次 Esc 即可放弃本次截图，即使正在输入标注文字也会直接退出，不保存、不复制。`Command+C` 复制但保留选区。
 
 ## 构建与验证
 
