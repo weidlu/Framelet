@@ -155,19 +155,23 @@ extension NSColor {
                 prepared.append((window, view, screen))
             }
 
-            // One routing point for the overlay. Text editors, modal panels and
-            // other application windows retain their own keyboard semantics.
+            // Route overlay keys without intercepting modal panels or other windows.
             clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self, self.sessionToken == token, self.selectionContinuation != nil else { return event }
                 if NSApp.modalWindow != nil { return event }
-                if let window = event.window, !self.overlays.contains(window) { return event }
-                if (event.window ?? NSApp.keyWindow)?.firstResponder is NSTextView { return event }
-                let view = (event.window?.contentView as? RegionView) ?? self.activeRegionView
+                let window = event.window ?? NSApp.keyWindow
+                if let window, !self.overlays.contains(window) { return event }
+                let view = (window?.contentView as? RegionView) ?? self.activeRegionView
+                if event.keyCode == 53 {
+                    if let view { view.handleCancelRequest() }
+                    else { self.finish(.success(.cancelled)) }
+                    return nil
+                }
+                if window?.firstResponder is NSTextView { return event }
                 if let view {
                     if (123...126).contains(Int(event.keyCode)), view.cornerSliderHasFocus() { return event }
                     return view.handleKey(event) ? nil : event
                 }
-                if event.keyCode == 53 { self.finish(.success(.cancelled)); return nil }
                 return event
             }
 
@@ -944,25 +948,14 @@ private final class RegionView: NSView {
         set { if let newValue { UserDefaults.standard.set(newValue.path, forKey: "framelet.lastSaveDir") } }
     }
 
-    /// Single cancel entry used by Esc, `cancelOperation`, the toolbar and the
-    /// local event router. Cancels an in-progress stroke or text edit first and
-    /// keeps the session alive; otherwise exits the whole session.
     func handleCancelRequest() {
-        if canvas?.cancelPendingStroke() == true { return }
-        if canvas?.isEditingText == true {
-            canvas?.abandonText()
-            window?.makeFirstResponder(self)
-            return
-        }
         cancelCapture()
     }
 
-    /// Single exit point. Esc while a stroke or text edit is in progress cancels
-    /// that operation first and keeps the session alive; otherwise it exits.
     private func cancelCapture() {
         guard !committing, !exited else { return }
         exited = true
-        canvas?.commitText()
+        canvas?.abandonText()
         document?.invalidate()
         onFinish(.cancelled)
     }

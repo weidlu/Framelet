@@ -220,16 +220,6 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
     }
     override func cancelOperation(_ sender: Any?) { onCancel?() }
 
-    /// Drops the in-progress stroke (if any) and reports whether one existed.
-    @discardableResult
-    func cancelPendingStroke() -> Bool {
-        guard pending != nil else { return false }
-        pending = nil; needsDisplay = true
-        return true
-    }
-
-    var isEditingText: Bool { textField != nil }
-
     private func beginText(at point: CGPoint, viewPoint: CGPoint) {
         commitText()
         let area = selectionBounds
@@ -269,7 +259,8 @@ final class CaptureCanvasView: NSView, NSTextFieldDelegate {
     func controlTextDidEndEditing(_ notification: Notification) { commitText() }
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-            textField?.stringValue = ""; commitText(); window?.makeFirstResponder(self); return true
+            onCancel?()
+            return true
         }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
             commitText(); window?.makeFirstResponder(self); return true
